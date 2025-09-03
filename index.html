@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Switch風 Web Launcher</title>
+<style>
+  body {
+    margin: 0;
+    background-color: #fff;
+    font-family: sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  #launcher {
+    display: flex;
+    gap: 30px; /* 初期gap、JSで調整 */
+    overflow-x: auto;
+    padding: 50px 20px;
+    transition: gap 0.2s;
+  }
+
+  .icon {
+    background-color: #eee;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.2s, box-shadow 0.2s;
+    font-size: 24px;
+    user-select: none;
+  }
+
+  .icon.selected {
+    transform: scale(1.4);
+    box-shadow: 0 0 20px rgba(0,0,0,0.4);
+    z-index: 10;
+  }
+
+  #iconName {
+    margin-top: 20px;
+    font-size: 24px;
+    font-weight: bold;
+  }
+
+  #addWebForm {
+    margin-top: 30px;
+    display: flex;
+    gap: 10px;
+  }
+
+  #addWebForm input {
+    padding: 5px;
+    font-size: 16px;
+  }
+
+  #addWebForm button {
+    padding: 5px 10px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="launcher"></div>
+<div id="iconName"></div>
+
+<div id="addWebForm">
+  <input type="text" id="webName" placeholder="名前">
+  <input type="text" id="webUrl" placeholder="URL">
+  <button onclick="addWeb()">追加</button>
+</div>
+
+<script>
+let launcher = document.getElementById('launcher');
+let iconNameDisplay = document.getElementById('iconName');
+let selectedIndex = 0;
+let icons = [];
+
+// 初期アイコン
+let initialWebs = [
+  {name: 'Google', url: 'https://www.google.com'},
+  {name: 'YouTube', url: 'https://www.youtube.com'},
+  {name: 'Twitter', url: 'https://twitter.com'},
+  {name: 'Discord', url: 'https://discord.com'},
+  {name: 'Reddit', url: 'https://www.reddit.com'}
+];
+
+// アイコンサイズとgapを画面幅に応じて計算
+function adjustSizes() {
+  const screenWidth = window.innerWidth;
+  const iconSize = Math.min(150, Math.max(80, screenWidth / 10)); // 80〜150px
+  const gap = Math.min(50, screenWidth / 30); // 間隔調整
+  document.querySelectorAll('.icon').forEach(icon => {
+    icon.style.width = iconSize + 'px';
+    icon.style.height = iconSize + 'px';
+    icon.style.fontSize = (iconSize / 3) + 'px';
+  });
+  launcher.style.gap = gap + 'px';
+}
+
+function renderIcons() {
+  launcher.innerHTML = '';
+  icons.forEach((icon, index) => {
+    let div = document.createElement('div');
+    div.className = 'icon';
+    if(index === selectedIndex) div.classList.add('selected');
+    div.textContent = icon.name[0];
+    launcher.appendChild(div);
+  });
+  adjustSizes();
+  updateIconName();
+}
+
+function updateIconName() {
+  if(icons[selectedIndex]) {
+    iconNameDisplay.textContent = icons[selectedIndex].name;
+  } else {
+    iconNameDisplay.textContent = '';
+  }
+}
+
+function addWeb() {
+  let name = document.getElementById('webName').value;
+  let url = document.getElementById('webUrl').value;
+  if(name && url) {
+    icons.push({name, url});
+    renderIcons();
+    document.getElementById('webName').value = '';
+    document.getElementById('webUrl').value = '';
+  }
+}
+
+// コントローラー入力
+window.addEventListener("gamepadconnected", function(e) {
+  console.log("Gamepad connected:", e.gamepad);
+});
+
+function pollGamepad() {
+  let gp = navigator.getGamepads()[0];
+  if(gp) {
+    if(gp.buttons[14].pressed || gp.axes[0] < -0.5) moveSelection(-1);
+    if(gp.buttons[15].pressed || gp.axes[0] > 0.5) moveSelection(1);
+    if(gp.buttons[0].pressed && !pollGamepad.lastA) openWeb();
+    pollGamepad.lastA = gp.buttons[0].pressed;
+  }
+  requestAnimationFrame(pollGamepad);
+}
+
+function moveSelection(dir) {
+  let newIndex = selectedIndex + dir;
+  if(newIndex >= 0 && newIndex < icons.length) {
+    selectedIndex = newIndex;
+    renderIcons();
+  }
+}
+
+function openWeb() {
+  if(icons[selectedIndex]) {
+    window.open(icons[selectedIndex].url, '_blank');
+  }
+}
+
+// 初期化
+icons = initialWebs;
+renderIcons();
+pollGamepad();
+
+// 画面リサイズ対応
+window.addEventListener('resize', adjustSizes);
+</script>
+
+</body>
+</html>
