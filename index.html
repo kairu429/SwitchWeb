@@ -7,18 +7,25 @@
     body {
       margin: 0;
       height: 100vh;
-      background: linear-gradient(180deg, #0d0d0d, #1a1a1a);
+      background: linear-gradient(180deg, #2c2c2c, #1a1a1a);
       color: white;
       font-family: "Segoe UI", sans-serif;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
+    .main-area {
+      display: flex;
+      flex-grow: 1;
+      padding: 80px 40px;
+      overflow: hidden;
+      align-items: center;
+      gap: 60px;
+    }
     .launcher {
       display: flex;
       gap: 40px;
-      padding: 80px;
-      overflow: hidden; /* 手動スクロール禁止 */
+      overflow: hidden;
       flex-grow: 1;
       align-items: center;
     }
@@ -26,7 +33,7 @@
       flex-shrink: 0;
       width: 160px;
       height: 160px;
-      background: #222;
+      background: #333;
       border-radius: 25px;
       display: flex;
       align-items: center;
@@ -54,10 +61,42 @@
       padding: 0 20px;
       font-size: 14px;
     }
+    .add-url {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 200px;
+    }
+    .add-url input {
+      padding: 8px;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+      font-size: 14px;
+    }
+    .add-url button {
+      padding: 8px;
+      border-radius: 8px;
+      border: none;
+      background: #4a90e2;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .add-url button:hover {
+      background: #357ab8;
+    }
   </style>
 </head>
 <body>
-  <div class="launcher" id="launcher"></div>
+  <div class="main-area">
+    <div class="launcher" id="launcher"></div>
+    <div class="add-url">
+      <input type="text" id="newUrl" placeholder="URLを追加">
+      <button id="addBtn">追加</button>
+    </div>
+  </div>
 
   <div class="ui-bar">
     <span id="time"></span>
@@ -66,6 +105,8 @@
   <script>
     const launcher = document.getElementById("launcher");
     const timeLabel = document.getElementById("time");
+    const addBtn = document.getElementById("addBtn");
+    const newUrlInput = document.getElementById("newUrl");
 
     let apps = JSON.parse(localStorage.getItem("apps")) || [
       "https://youtube.com",
@@ -109,26 +150,21 @@
     function updateView() {
       const appDivs = document.querySelectorAll(".app");
       if (!appDivs[selectedIndex]) return;
-
       const selected = appDivs[selectedIndex];
-      const launcherRect = launcher.getBoundingClientRect();
-      const selectedRect = selected.getBoundingClientRect();
 
-      // 選択中のアイコンが画面左1/3～右2/3に収まるように調整
       const offset = selected.offsetLeft - launcher.clientWidth / 3;
-      launcher.scrollTo({
-        left: offset,
-        behavior: "smooth"
-      });
+      launcher.scrollTo({ left: offset, behavior: "smooth" });
     }
 
     function moveSelection(dir) {
-      selectedIndex = Math.max(0, Math.min(apps.length - 1, selectedIndex + dir));
+      selectedIndex += dir;
+      if (selectedIndex < 0) selectedIndex = 0;
+      if (selectedIndex >= apps.length) selectedIndex = apps.length - 1;
       updateFocus();
       updateView();
     }
 
-    // キーボード操作（→ ←）
+    // キーボード操作
     window.addEventListener("keydown", e => {
       if (e.key === "ArrowRight") moveSelection(1);
       if (e.key === "ArrowLeft") moveSelection(-1);
@@ -136,13 +172,21 @@
     });
 
     // コントローラー操作（Gamepad API）
-    let gamepadIndex = null;
+    let lastMoveTime = 0;
     function gamepadLoop() {
+      const now = performance.now();
       const gamepads = navigator.getGamepads();
       if (gamepads[0]) {
         const gp = gamepads[0];
-        if (gp.buttons[15]?.pressed) moveSelection(1);  // → ボタン
-        if (gp.buttons[14]?.pressed) moveSelection(-1); // ← ボタン
+
+        if (gp.buttons[15]?.pressed && now - lastMoveTime > 200) {  // →ボタン
+          moveSelection(1);
+          lastMoveTime = now;
+        }
+        if (gp.buttons[14]?.pressed && now - lastMoveTime > 200) { // ←ボタン
+          moveSelection(-1);
+          lastMoveTime = now;
+        }
         if (gp.buttons[0]?.pressed) window.open(apps[selectedIndex], "_blank"); // Aボタン
       }
       requestAnimationFrame(gamepadLoop);
@@ -156,6 +200,16 @@
     }
     setInterval(updateTime, 1000);
     updateTime();
+
+    // URL追加
+    addBtn.onclick = () => {
+      const url = newUrlInput.value.trim();
+      if (!url) return;
+      apps.push(url);
+      localStorage.setItem("apps", JSON.stringify(apps));
+      newUrlInput.value = "";
+      renderApps();
+    };
 
     renderApps();
   </script>
