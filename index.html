@@ -1,194 +1,172 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>URL Launcher</title>
-  <style>
-    body {
-      margin: 0;
-      background: black;
-      color: white;
-      font-family: "Segoe UI", sans-serif;
-      overflow: hidden;
-    }
-    /* ステータスバー */
-    .status-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 16px;
-      background: rgba(0, 0, 0, 0.5);
-      font-size: 12px;
-    }
-    .status-bar .right {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    /* メイン */
-    .title {
-      margin: 16px;
-      font-size: 18px;
-      color: #aaa;
-    }
-    .selected-title {
-      text-align: center;
-      margin-bottom: 16px;
-      font-size: 20px;
-      color: cyan;
-    }
-    .scroll-container {
-      display: flex;
-      gap: 24px;
-      overflow-x: auto;
-      scroll-behavior: smooth;
-      padding: 0 40px;
-    }
-    .tile {
-      position: relative;
-      flex-shrink: 0;
-      width: 190px;
-      height: 250px;
-      border-radius: 20px;
-      background: linear-gradient(135deg, #444, #222);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      transition: transform 0.2s;
-    }
-    .tile.selected {
-      transform: scale(1.1);
-      border: 4px solid white;
-      box-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
-    }
-    .icon-box {
-      width: 140px;
-      height: 140px;
-      border-radius: 20px;
-      background: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 12px;
-      overflow: hidden;
-    }
-    .icon-box img {
-      width: 110px;
-      height: 110px;
-      object-fit: contain;
-    }
-    .tile span {
-      font-size: 14px;
-      text-align: center;
-    }
-    /* 下部操作ヘルプ */
-    .bottom-bar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: rgba(30,30,30,0.95);
-      border-top: 1px solid #444;
-      padding: 8px;
-      text-align: center;
-      font-size: 12px;
-      color: #aaa;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>URL Launcher</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    color: white;
+    font-weight: bold;
+    background-color: rgba(0,0,0,0.7);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    z-index: 1000;
+  }
+  .toast.show { opacity: 1; pointer-events: auto; }
+</style>
 </head>
-<body>
-  <div class="status-bar">
-    <div>👤 ユーザー</div>
-    <div class="right">
-      📶 <span id="time">00:00</span>
-    </div>
+<body class="bg-black text-white font-sans min-h-screen flex flex-col">
+
+<!-- Top Status Bar -->
+<div class="flex items-center justify-between px-4 py-2 bg-black/50">
+  <div class="flex items-center gap-3">
+    <div class="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white text-xs font-bold">U</div>
+    <span class="text-xs text-gray-300">ユーザー</span>
   </div>
-
-  <div class="title">すべてのソフト</div>
-  <div class="selected-title" id="selectedTitle">Google</div>
-
-  <div class="scroll-container" id="scrollContainer">
-    <!-- サンプルURLタイル -->
-    <div class="tile selected" data-url="https://google.com" data-title="Google">
-      <div class="icon-box">
-        <img src="https://www.google.com/favicon.ico" alt="Google">
-      </div>
-      <span>Google</span>
-    </div>
-    <div class="tile" data-url="https://youtube.com" data-title="YouTube">
-      <div class="icon-box">
-        <img src="https://www.youtube.com/favicon.ico" alt="YouTube">
-      </div>
-      <span>YouTube</span>
-    </div>
-    <div class="tile" data-url="https://github.com" data-title="GitHub">
-      <div class="icon-box">
-        <img src="https://github.com/favicon.ico" alt="GitHub">
-      </div>
-      <span>GitHub</span>
-    </div>
-    <div class="tile" data-url="https://twitter.com" data-title="Twitter">
-      <div class="icon-box">
-        <img src="https://twitter.com/favicon.ico" alt="Twitter">
-      </div>
-      <span>Twitter</span>
-    </div>
-    <div class="tile" data-url="https://netflix.com" data-title="Netflix">
-      <div class="icon-box">
-        <img src="https://www.netflix.com/favicon.ico" alt="Netflix">
-      </div>
-      <span>Netflix</span>
-    </div>
+  <div class="flex items-center gap-2">
+    <span class="text-xs text-white">Wi-Fi</span>
+    <span class="text-xs text-green-400">100%</span>
+    <span id="time" class="text-xs font-mono ml-2"></span>
   </div>
+</div>
 
-  <div class="bottom-bar">
-    ⬅➡ 移動　|　Enter 決定
+<!-- Main Content -->
+<div class="flex-1 px-8 py-6 flex flex-col">
+  <h1 class="text-xl font-normal text-gray-300 mb-6">すべてのソフト</h1>
+  <div id="selected-title" class="h-12 mb-6 flex items-center justify-center text-xl text-cyan-400"></div>
+  <div id="app-scroll-container" class="flex gap-8 overflow-x-auto scrollbar-hide max-w-full px-4">
+    <!-- URL tiles inserted via JS -->
   </div>
+</div>
 
-  <script>
-    const tiles = document.querySelectorAll('.tile');
-    const scrollContainer = document.getElementById('scrollContainer');
-    const selectedTitle = document.getElementById('selectedTitle');
-    let selectedIndex = 0;
+<!-- Bottom Controls -->
+<div class="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 px-6 py-3">
+  <div class="flex items-center justify-center gap-6 text-xs text-gray-400">
+    <div class="flex items-center gap-2"><div class="w-5 h-5 bg-gray-600 rounded flex items-center justify-center text-xs font-bold">A</div><span>決定</span></div>
+    <div class="flex items-center gap-2"><div class="w-5 h-5 bg-gray-600 rounded flex items-center justify-center text-xs font-bold">Y</div><span>追加</span></div>
+    <div class="flex items-center gap-2"><div class="w-5 h-5 bg-gray-600 rounded flex items-center justify-center text-xs">⊞</div><span>移動</span></div>
+  </div>
+</div>
 
-    function updateSelection(newIndex) {
-      if (newIndex < 0 || newIndex >= tiles.length) return;
-      tiles[selectedIndex].classList.remove('selected');
-      selectedIndex = newIndex;
-      tiles[selectedIndex].classList.add('selected');
-      selectedTitle.textContent = tiles[selectedIndex].dataset.title;
+<!-- Toast -->
+<div id="toast" class="toast"></div>
 
-      // 中央にスクロール
-      const item = tiles[selectedIndex];
-      const containerRect = scrollContainer.getBoundingClientRect();
-      const itemRect = item.getBoundingClientRect();
-      const offset = itemRect.left - containerRect.left + itemRect.width/2 - containerRect.width/2;
-      scrollContainer.scrollTo({
-        left: scrollContainer.scrollLeft + offset,
-        behavior: "smooth"
-      });
-    }
+<script>
+let urls = [
+  { id: '1', title: 'Google', url: 'https://google.com' },
+  { id: '2', title: 'YouTube', url: 'https://youtube.com' },
+  { id: '3', title: 'GitHub', url: 'https://github.com' },
+  { id: '4', title: 'Twitter', url: 'https://twitter.com' },
+  { id: '5', title: 'Netflix', url: 'https://netflix.com' },
+];
 
-    // キーボード操作
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowRight") updateSelection(selectedIndex + 1);
-      if (e.key === "ArrowLeft") updateSelection(selectedIndex - 1);
-      if (e.key === "Enter") {
-        window.open(tiles[selectedIndex].dataset.url, "_blank");
-      }
-    });
+let selectedIndex = 0;
 
-    // 時間更新
-    function updateTime() {
-      const now = new Date();
-      document.getElementById("time").textContent =
-        now.getHours().toString().padStart(2, "0") + ":" +
-        now.getMinutes().toString().padStart(2, "0");
-    }
-    setInterval(updateTime, 1000);
-    updateTime();
-  </script>
+const container = document.getElementById('app-scroll-container');
+const selectedTitle = document.getElementById('selected-title');
+const toastEl = document.getElementById('toast');
+
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(()=>toastEl.classList.remove('show'),1500);
+}
+
+function updateTime() {
+  const now = new Date();
+  document.getElementById('time').textContent = now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',hour12:false});
+}
+setInterval(updateTime,1000);
+updateTime();
+
+function saveUrls() { localStorage.setItem('urlLauncher-urls',JSON.stringify(urls)); }
+function loadUrls() { 
+  const saved = localStorage.getItem('urlLauncher-urls'); 
+  if(saved) urls = JSON.parse(saved); 
+}
+
+function renderTiles() {
+  container.innerHTML = '';
+  urls.forEach((url,index)=>{
+    const tile = document.createElement('div');
+    tile.className = `relative flex-shrink-0 w-48 h-64 rounded-4xl p-4 flex flex-col items-center justify-center cursor-pointer transition-transform ${selectedIndex===index?'scale-110 border-4 border-white':'hover:scale-105 border-2 border-transparent'}`;
+    tile.innerHTML = `<div class="text-center text-white text-lg">${url.title}</div>`;
+    tile.onclick = () => { selectedIndex=index; openUrl(url.url); renderTiles(); };
+    // Delete button
+    const del = document.createElement('button');
+    del.className = 'absolute top-2 right-2 w-6 h-6 bg-red-600 rounded-full text-white text-sm';
+    del.textContent = '×';
+    del.onclick = (e)=>{ e.stopPropagation(); urls.splice(index,1); selectedIndex=Math.max(0,selectedIndex-1); saveUrls(); renderTiles(); showToast('URLを削除しました'); };
+    tile.appendChild(del);
+    container.appendChild(tile);
+  });
+
+  // Add new tile
+  const addTile = document.createElement('div');
+  addTile.className = `relative flex-shrink-0 w-48 h-64 rounded-4xl p-4 flex items-center justify-center cursor-pointer transition-transform ${selectedIndex===urls.length?'scale-110 border-4 border-white':'hover:scale-105 border-2 border-dashed border-gray-600'}`;
+  addTile.textContent = '+ 追加';
+  addTile.onclick = addURL;
+  container.appendChild(addTile);
+
+  // Update selected title
+  if(selectedIndex<urls.length) selectedTitle.textContent = urls[selectedIndex].title;
+  else selectedTitle.textContent = '新しいURLを追加';
+}
+
+function addURL(){
+  const title = prompt('タイトル:');
+  const url = prompt('URL:');
+  if(!title||!url){ showToast('タイトルとURLを入力してください'); return; }
+  const formattedUrl = url.startsWith('http')?url:'https://'+url;
+  urls.push({id:Date.now().toString(),title:title,url:formattedUrl});
+  selectedIndex = urls.length-1;
+  saveUrls();
+  renderTiles();
+  showToast('URLを追加しました');
+}
+
+function openUrl(url){ window.open(url,'_blank'); }
+
+window.addEventListener('keydown',(e)=>{
+  switch(e.key){
+    case 'ArrowLeft': selectedIndex=Math.max(0,selectedIndex-1); renderTiles(); break;
+    case 'ArrowRight': selectedIndex=Math.min(urls.length,selectedIndex+1); renderTiles(); break;
+    case 'Enter': 
+    case ' ': 
+      if(selectedIndex===urls.length){ addURL(); } 
+      else openUrl(urls[selectedIndex].url); 
+      break;
+  }
+});
+
+// Gamepad support
+let lastButtonStates = [];
+function handleGamepad(){
+  const gp = navigator.getGamepads()[0];
+  if(!gp) return;
+  const currentStates = gp.buttons.map(b=>b.pressed);
+  const wasPressed = (i)=>currentStates[i]&&!lastButtonStates[i];
+  // D-pad left/right
+  if((gp.buttons[14]?.pressed)&&!lastButtonStates[14]){ selectedIndex=Math.max(0,selectedIndex-1); renderTiles(); }
+  if((gp.buttons[15]?.pressed)&&!lastButtonStates[15]){ selectedIndex=Math.min(urls.length,selectedIndex+1); renderTiles(); }
+  // A button
+  if(wasPressed(0)){ if(selectedIndex===urls.length) addURL(); else openUrl(urls[selectedIndex].url); }
+  lastButtonStates = currentStates;
+}
+setInterval(handleGamepad,100);
+
+loadUrls();
+renderTiles();
+</script>
+
 </body>
 </html>
