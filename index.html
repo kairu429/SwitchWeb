@@ -2,186 +2,45 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>URL Launcher - GUI強化版</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>URL Launcher - 完全版</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<style>
-  .scrollbar-hide::-webkit-scrollbar { display: none; }
-  .toast {
-    position: fixed;
-    bottom: 80px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 0.5rem 1rem;
-    border-radius: 1rem;
-    color: white;
-    font-weight: bold;
-    background-color: rgba(0,0,0,0.8);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s, transform 0.3s;
-    z-index: 1000;
-  }
-  .toast.show { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(-10px); }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
-<body class="bg-gray-900 text-white font-sans min-h-screen flex flex-col">
+<body class="dark">
 
 <!-- Top Status Bar -->
-<div class="flex items-center justify-between px-4 py-2 bg-gray-800/50 backdrop-blur-sm">
+<div class="flex justify-between items-center px-4 py-2 bg-black/50 backdrop-blur-sm">
   <div class="flex items-center gap-3">
     <div class="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white text-xs font-bold">U</div>
     <span class="text-xs text-gray-300">ユーザー</span>
   </div>
-  <div class="flex items-center gap-2">
-    <span class="text-xs text-white">Wi-Fi</span>
-    <span class="text-xs text-green-400">100%</span>
-    <span id="time" class="text-xs font-mono ml-2"></span>
+  <div class="flex items-center gap-2 text-xs text-gray-400">
+    <span>Wi-Fi</span>
+    <span class="text-green-400">100%</span>
+    <span id="time">--:--</span>
   </div>
 </div>
 
 <!-- Main Content -->
-<div class="flex-1 px-8 py-6 flex flex-col">
-  <h1 class="text-2xl font-semibold text-gray-300 mb-6">すべてのソフト</h1>
-  <div id="selected-title" class="h-12 mb-6 flex items-center justify-center text-xl text-cyan-400"></div>
-  <div id="app-scroll-container" class="flex gap-6 overflow-x-auto scrollbar-hide max-w-full px-4">
-    <!-- タイルはJSで挿入 -->
-  </div>
+<div class="px-6 py-4 flex flex-col flex-1">
+  <h1 class="text-xl font-medium text-gray-300 mb-4">すべてのソフト</h1>
+  <div id="selected-title" class="h-12 mb-6 flex items-center justify-center text-cyan-400 font-semibold text-xl drop-shadow-lg"></div>
+  <div id="app-scroll-container" class="flex gap-6 overflow-x-auto scrollbar-hide"></div>
 </div>
 
 <!-- Bottom Controls -->
-<div class="fixed bottom-0 left-0 right-0 bg-gray-800/95 backdrop-blur-sm border-t border-gray-700 px-6 py-3">
-  <div class="flex items-center justify-center gap-6 text-xs text-gray-400">
-    <div class="flex items-center gap-2"><div class="w-5 h-5 bg-gray-600 rounded flex items-center justify-center text-xs font-bold">A</div><span>決定</span></div>
-    <div class="flex items-center gap-2"><div class="w-5 h-5 bg-gray-600 rounded flex items-center justify-center text-xs font-bold">Y</div><span>追加</span></div>
-    <div class="flex items-center gap-2"><div class="w-5 h-5 bg-gray-600 rounded flex items-center justify-center text-xs">⊞</div><span>移動</span></div>
+<div class="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 px-6 py-3">
+  <div class="flex justify-center gap-6 text-xs text-gray-400">
+    <div class="flex items-center gap-2"><div class="w-5 h-5 bg-gray-600 rounded flex items-center justify-center text-xs font-bold">A</div>決定</div>
+    <div class="flex items-center gap-2"><div class="w-5 h-5 bg-gray-600 rounded flex items-center justify-center text-xs font-bold">Y</div>追加</div>
+    <div class="flex items-center gap-2"><div class="w-5 h-5 bg-gray-600 rounded flex items-center justify-center text-xs">⊞</div>移動</div>
   </div>
 </div>
 
 <!-- Toast -->
-<div id="toast" class="toast"></div>
+<div id="toast" class="toast fixed bottom-20 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-xl bg-black/80 text-white text-sm opacity-0 pointer-events-none transition-all"></div>
 
-<script>
-let urls = [
-  { id: '1', title: 'Google', url: 'https://google.com' },
-  { id: '2', title: 'YouTube', url: 'https://youtube.com' },
-  { id: '3', title: 'GitHub', url: 'https://github.com' },
-  { id: '4', title: 'Twitter', url: 'https://twitter.com' },
-  { id: '5', title: 'Netflix', url: 'https://netflix.com' },
-];
-let selectedIndex = 0;
-
-const container = document.getElementById('app-scroll-container');
-const selectedTitle = document.getElementById('selected-title');
-const toastEl = document.getElementById('toast');
-
-function showToast(msg) {
-  toastEl.textContent = msg;
-  toastEl.classList.add('show');
-  setTimeout(()=>toastEl.classList.remove('show'),1500);
-}
-
-function updateTime() {
-  const now = new Date();
-  document.getElementById('time').textContent = now.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',hour12:false});
-}
-setInterval(updateTime,1000);
-updateTime();
-
-function saveUrls() { localStorage.setItem('urlLauncher-urls',JSON.stringify(urls)); }
-function loadUrls() { 
-  const saved = localStorage.getItem('urlLauncher-urls'); 
-  if(saved) urls = JSON.parse(saved); 
-}
-
-function renderTiles() {
-  container.innerHTML = '';
-  urls.forEach((url,index)=>{
-    const tile = document.createElement('div');
-    tile.className = `relative flex-shrink-0 w-48 h-64 rounded-3xl p-4 flex flex-col items-center justify-center cursor-pointer transition-transform duration-300 ${selectedIndex===index?'scale-110 shadow-2xl border-4 border-cyan-400':'hover:scale-105 border-2 border-transparent'}`;
-
-    // アイコン
-    const icon = document.createElement('img');
-    icon.src = `https://www.google.com/s2/favicons?domain=${new URL(url.url).hostname}&sz=128`;
-    icon.alt = url.title;
-    icon.className = 'w-24 h-24 mb-3 rounded-2xl object-contain bg-gray-100';
-    tile.appendChild(icon);
-
-    // タイトル
-    const title = document.createElement('div');
-    title.className = 'text-center text-white text-lg font-medium';
-    title.textContent = url.title;
-    tile.appendChild(title);
-
-    // 削除ボタン
-    const del = document.createElement('button');
-    del.className = 'absolute top-2 right-2 w-6 h-6 bg-red-600 rounded-full text-white text-sm flex items-center justify-center';
-    del.textContent = '×';
-    del.onclick = (e)=>{
-      e.stopPropagation();
-      urls.splice(index,1);
-      selectedIndex=Math.max(0,selectedIndex-1);
-      saveUrls();
-      renderTiles();
-      showToast('URLを削除しました');
-    };
-    tile.appendChild(del);
-
-    tile.onclick = () => { selectedIndex=index; openUrl(url.url); renderTiles(); };
-    container.appendChild(tile);
-  });
-
-  // 追加タイル
-  const addTile = document.createElement('div');
-  addTile.className = `relative flex-shrink-0 w-48 h-64 rounded-3xl p-4 flex flex-col items-center justify-center cursor-pointer transition-transform duration-300 ${selectedIndex===urls.length?'scale-110 shadow-2xl border-4 border-white':'hover:scale-105 border-2 border-dashed border-gray-600'}`;
-  addTile.innerHTML = '<div class="w-24 h-24 bg-gray-700 rounded-2xl flex items-center justify-center mb-3 text-4xl text-gray-300">+</div><div class="text-gray-300">追加</div>';
-  addTile.onclick = addURL;
-  container.appendChild(addTile);
-
-  selectedTitle.textContent = selectedIndex<urls.length?urls[selectedIndex].title:'新しいURLを追加';
-}
-
-function addURL(){
-  const title = prompt('タイトル:');
-  const url = prompt('URL:');
-  if(!title||!url){ showToast('タイトルとURLを入力してください'); return; }
-  const formattedUrl = url.startsWith('http')?url:'https://'+url;
-  urls.push({id:Date.now().toString(),title:title,url:formattedUrl});
-  selectedIndex = urls.length-1;
-  saveUrls();
-  renderTiles();
-  showToast('URLを追加しました');
-}
-
-function openUrl(url){ window.open(url,'_blank'); }
-
-window.addEventListener('keydown',(e)=>{
-  switch(e.key){
-    case 'ArrowLeft': selectedIndex=Math.max(0,selectedIndex-1); renderTiles(); break;
-    case 'ArrowRight': selectedIndex=Math.min(urls.length,selectedIndex+1); renderTiles(); break;
-    case 'Enter': 
-    case ' ': 
-      if(selectedIndex===urls.length){ addURL(); } 
-      else openUrl(urls[selectedIndex].url); 
-      break;
-  }
-});
-
-// Gamepad
-let lastButtonStates = [];
-function handleGamepad(){
-  const gp = navigator.getGamepads()[0];
-  if(!gp) return;
-  const curr = gp.buttons.map(b=>b.pressed);
-  const wasPressed = (i)=>curr[i]&&!lastButtonStates[i];
-  if((gp.buttons[14]?.pressed)&&!lastButtonStates[14]){ selectedIndex=Math.max(0,selectedIndex-1); renderTiles(); }
-  if((gp.buttons[15]?.pressed)&&!lastButtonStates[15]){ selectedIndex=Math.min(urls.length,selectedIndex+1); renderTiles(); }
-  if(wasPressed(0)){ if(selectedIndex===urls.length) addURL(); else openUrl(urls[selectedIndex].url); }
-  lastButtonStates = curr;
-}
-setInterval(handleGamepad,100);
-
-loadUrls();
-renderTiles();
-</script>
+<script src="app.js"></script>
 </body>
 </html>
