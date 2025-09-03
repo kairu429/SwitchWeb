@@ -1,181 +1,129 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>Switch風 Web Launcher</title>
-<style>
-  body {
-    margin: 0;
-    background-color: #fff;
-    font-family: sans-serif;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    overflow: hidden;
-  }
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Switch風 Web Launcher — 軽量版</title>
+  <style>
+    :root{
+      --icon-size:150px;
+      --icon-gap:24px;
+      --horizontal-padding:48px;
+      --scroll-speed:300ms;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;height:100%;
+      background:#dcdcdc;
+      font-family: Inter, system-ui, -apple-system, "Noto Sans JP", "Yu Gothic", sans-serif;
+      color:#0b1220; overflow:hidden;
+      display:flex; align-items:center; justify-content:center;
+    }
 
-  #launcher {
-    display: flex;
-    gap: 30px; /* 初期gap、JSで調整 */
-    overflow-x: auto;
-    padding: 50px 20px;
-    transition: gap 0.2s;
-  }
+    .launcher-wrap{ width:100%; height:100%; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; position:relative; }
 
-  .icon {
-    background-color: #eee;
-    border-radius: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: transform 0.2s, box-shadow 0.2s;
-    font-size: 24px;
-    user-select: none;
-  }
+    .rack{ width:100%; display:flex; align-items:center; justify-content:flex-start; overflow:hidden; padding-left:var(--horizontal-padding); }
+    .carousel{ display:flex; align-items:center; gap:var(--icon-gap); padding-right:var(--horizontal-padding); will-change:transform; transition:transform var(--scroll-speed) ease-out; transform:translateX(0); }
 
-  .icon.selected {
-    transform: scale(1.4);
-    box-shadow: 0 0 20px rgba(0,0,0,0.4);
-    z-index: 10;
-  }
+    .tile{ width:var(--icon-size); height:var(--icon-size); border-radius:16px; background:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 4px 12px rgba(12,20,40,0.08); transform-origin:center center; transition: transform 200ms, box-shadow 200ms, border 200ms; position:relative; cursor:pointer; }
+    .tile.selected{ transform: scale(1.05); z-index:80; box-shadow:0 15px 40px rgba(12,20,40,0.2); border:3px solid #fff; }
 
-  #iconName {
-    margin-top: 20px;
-    font-size: 24px;
-    font-weight: bold;
-  }
+    .icon-img{ width:100%; height:100%; object-fit:contain; border-radius:12px; display:block; }
 
-  #addWebForm {
-    margin-top: 30px;
-    display: flex;
-    gap: 10px;
-  }
+    .mini-label{ position:absolute; bottom:calc(100% + 10px); left:50%; transform:translateX(-50%); background:rgba(255,255,255,0.95); padding:4px 10px; border-radius:8px; font-weight:700; font-size:14px; box-shadow:0 4px 12px rgba(12,20,40,0.08); white-space:nowrap; pointer-events:none; color:#0b1220; opacity:0; transition:opacity 200ms; }
+    .tile.selected .mini-label{ opacity:1; }
 
-  #addWebForm input {
-    padding: 5px;
-    font-size: 16px;
-  }
+    .footer{ position:fixed; bottom:14px; left:50%; transform:translateX(-50%); display:flex; gap:14px; align-items:center; font-size:13px; color:#333; z-index:110 }
 
-  #addWebForm button {
-    padding: 5px 10px;
-    font-size: 16px;
-    cursor: pointer;
-  }
-</style>
+    @media (max-width:640px){ :root{ --icon-gap:16px; --icon-size:120px; } }
+  </style>
 </head>
 <body>
+  <div class="launcher-wrap" role="application" aria-label="Web Launcher">
+    <div class="rack">
+      <div id="carousel" class="carousel" role="list" aria-label="Icon list"></div>
+    </div>
+    <div class="footer">← → : 選択　　Enter / A : 開く</div>
+  </div>
 
-<div id="launcher"></div>
-<div id="iconName"></div>
+  <script>
+    const DEFAULT_APPS = [
+      {name:'YouTube', url:'https://www.youtube.com'},
+      {name:'Google', url:'https://www.google.com'},
+      {name:'Twitter', url:'https://twitter.com'},
+      {name:'Discord', url:'https://discord.com'},
+      {name:'GitHub', url:'https://github.com'}
+    ];
+    const STORAGE_KEY = 'switch_launcher_light';
+    let apps = loadApps();
+    let selected = 0;
 
-<div id="addWebForm">
-  <input type="text" id="webName" placeholder="名前">
-  <input type="text" id="webUrl" placeholder="URL">
-  <button onclick="addWeb()">追加</button>
-</div>
+    const carousel = document.getElementById('carousel');
+    let currentOffset = 0;
 
-<script>
-let launcher = document.getElementById('launcher');
-let iconNameDisplay = document.getElementById('iconName');
-let selectedIndex = 0;
-let icons = [];
+    function loadApps(){ try{ const raw = localStorage.getItem(STORAGE_KEY); if(raw) return JSON.parse(raw); }catch(e){} return DEFAULT_APPS.slice(); }
+    function saveApps(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(apps)); }catch(e){} }
 
-// 初期アイコン
-let initialWebs = [
-  {name: 'Google', url: 'https://www.google.com'},
-  {name: 'YouTube', url: 'https://www.youtube.com'},
-  {name: 'Twitter', url: 'https://twitter.com'},
-  {name: 'Discord', url: 'https://discord.com'},
-  {name: 'Reddit', url: 'https://www.reddit.com'}
-];
+    function render(){
+      carousel.innerHTML = '';
+      apps.forEach((app, idx)=>{
+        const tile = document.createElement('div');
+        tile.className = 'tile';
+        tile.dataset.idx = idx;
 
-// アイコンサイズとgapを画面幅に応じて計算
-function adjustSizes() {
-  const screenWidth = window.innerWidth;
-  const iconSize = Math.min(150, Math.max(80, screenWidth / 10)); // 80〜150px
-  const gap = Math.min(50, screenWidth / 30); // 間隔調整
-  document.querySelectorAll('.icon').forEach(icon => {
-    icon.style.width = iconSize + 'px';
-    icon.style.height = iconSize + 'px';
-    icon.style.fontSize = (iconSize / 3) + 'px';
-  });
-  launcher.style.gap = gap + 'px';
-}
+        const img = document.createElement('img');
+        img.className = 'icon-img';
+        img.src = `https://www.google.com/s2/favicons?sz=256&domain=${new URL(app.url).hostname}`;
+        img.alt = app.name;
+        tile.appendChild(img);
 
-function renderIcons() {
-  launcher.innerHTML = '';
-  icons.forEach((icon, index) => {
-    let div = document.createElement('div');
-    div.className = 'icon';
-    if(index === selectedIndex) div.classList.add('selected');
-    div.textContent = icon.name[0];
-    launcher.appendChild(div);
-  });
-  adjustSizes();
-  updateIconName();
-}
+        const label = document.createElement('div');
+        label.className = 'mini-label';
+        label.textContent = app.name;
+        tile.appendChild(label);
 
-function updateIconName() {
-  if(icons[selectedIndex]) {
-    iconNameDisplay.textContent = icons[selectedIndex].name;
-  } else {
-    iconNameDisplay.textContent = '';
-  }
-}
+        carousel.appendChild(tile);
+      });
+      updateSelection(false);
+      centerTile(carousel.querySelector('.tile.selected'), false);
+    }
 
-function addWeb() {
-  let name = document.getElementById('webName').value;
-  let url = document.getElementById('webUrl').value;
-  if(name && url) {
-    icons.push({name, url});
-    renderIcons();
-    document.getElementById('webName').value = '';
-    document.getElementById('webUrl').value = '';
-  }
-}
+    function updateSelection(animate=true){
+      const tiles = Array.from(carousel.querySelectorAll('.tile'));
+      tiles.forEach(t=>t.classList.remove('selected'));
+      const selTile = tiles[selected];
+      if(selTile){ selTile.classList.add('selected'); centerTile(selTile, animate); }
+    }
 
-// コントローラー入力
-window.addEventListener("gamepadconnected", function(e) {
-  console.log("Gamepad connected:", e.gamepad);
-});
+    function centerTile(tile, animate){
+      if(!tile) return;
+      const tileRect = tile.getBoundingClientRect();
+      const viewportCenter = window.innerWidth / 2;
+      const tileCenter = tileRect.left + tileRect.width / 2;
+      const delta = viewportCenter - tileCenter;
+      currentOffset += delta;
+      carousel.style.transition = animate ? 'transform 400ms ease-out' : 'none';
+      carousel.style.transform = `translateX(${currentOffset}px)`;
+    }
 
-function pollGamepad() {
-  let gp = navigator.getGamepads()[0];
-  if(gp) {
-    if(gp.buttons[14].pressed || gp.axes[0] < -0.5) moveSelection(-1);
-    if(gp.buttons[15].pressed || gp.axes[0] > 0.5) moveSelection(1);
-    if(gp.buttons[0].pressed && !pollGamepad.lastA) openWeb();
-    pollGamepad.lastA = gp.buttons[0].pressed;
-  }
-  requestAnimationFrame(pollGamepad);
-}
+    function move(dir){
+      const max = apps.length - 1;
+      let n = selected + dir;
+      if(n<0) n=0; if(n>max) n=max;
+      if(n!==selected){ selected=n; updateSelection(true); }
+    }
 
-function moveSelection(dir) {
-  let newIndex = selectedIndex + dir;
-  if(newIndex >= 0 && newIndex < icons.length) {
-    selectedIndex = newIndex;
-    renderIcons();
-  }
-}
+    function openApp(i){ if(!apps[i]) return; window.open(apps[i].url, '_blank'); }
 
-function openWeb() {
-  if(icons[selectedIndex]) {
-    window.open(icons[selectedIndex].url, '_blank');
-  }
-}
+    window.addEventListener('keydown',(e)=>{
+      if(e.key==='ArrowLeft'){ move(-1); e.preventDefault(); }
+      if(e.key==='ArrowRight'){ move(1); e.preventDefault(); }
+      if(e.key==='Enter'){ openApp(selected); e.preventDefault(); }
+    });
 
-// 初期化
-icons = initialWebs;
-renderIcons();
-pollGamepad();
-
-// 画面リサイズ対応
-window.addEventListener('resize', adjustSizes);
-</script>
-
+    window.addEventListener('resize', ()=>{ setTimeout(()=>updateSelection(false),60); });
+    window.addEventListener('load', ()=>{ render(); });
+  </script>
 </body>
 </html>
