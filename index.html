@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>Switch風 Webランチャー — 矢印 & スティック対応 完全版</title>
+  <title>Switch風 Webランチャー</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root{
@@ -21,6 +21,8 @@
       display:flex;
       flex-direction:column;
       overflow:hidden;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
     }
 
     .topbar{display:flex;align-items:center;justify-content:flex-end;padding:10px 24px;color:#cfcfcf;gap:12px;}
@@ -36,6 +38,7 @@
     .app{
       position:relative; width:var(--icon-size); display:flex; flex-direction:column; align-items:center;
       justify-content:flex-start; flex-shrink:0; gap:8px; transition:transform .18s ease;
+      touch-action: manipulation; /* for better touch behaviour */
     }
     .app-name{
       margin:0; padding:0 6px; font-size:14.5px; font-weight:700; color:var(--accent);
@@ -74,7 +77,7 @@
       width:var(--circle-size); height:var(--circle-size); border-radius:50%;
       background:rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:center;
       border:2px solid rgba(255,255,255,0.06); cursor:pointer; transition:background .12s ease, transform .12s ease, box-shadow .12s ease;
-      color:#fff; font-weight:700; outline:none;
+      color:#fff; font-weight:700; outline:none; touch-action: manipulation;
     }
     .circle-btn.selected{ border-color:var(--accent); box-shadow:0 0 0 6px rgba(0,191,255,0.18); transform:translateY(-3px); background:rgba(0,191,255,0.06); }
     .circle-label{ font-size:13px; color:#ddd; text-align:center; user-select:none; }
@@ -159,7 +162,6 @@
 
     const AXIS_THRESHOLD = 0.5;
 
-    // Helpers
     function now() { return performance.now(); }
     function canInput() {
       const t = now();
@@ -169,7 +171,6 @@
     }
 
     function updateSelectionUI(){
-      // apps selection only active when circleIndex === -1
       apps().forEach((app, i) => {
         const isSelected = (circleIndex === -1 && i === selectedIndex);
         app.classList.toggle('selected', isSelected);
@@ -180,13 +181,8 @@
           nameEl.style.transform = isSelected ? 'translateY(0)' : 'translateY(-4px)';
         }
       });
-      // bottom selection
-      circleBtns.forEach((btn, i) => {
-        btn.classList.toggle('selected', i === circleIndex);
-      });
-      // visual compact effect
+      circleBtns.forEach((btn, i) => btn.classList.toggle('selected', i === circleIndex));
       launcher.classList.toggle('compact', true);
-      // ensure selected app visible when apps active
       if (circleIndex === -1) scrollSelectedIntoView();
     }
 
@@ -199,13 +195,11 @@
       launcher.scrollBy({ left: offset, behavior: 'smooth' });
     }
 
-    // Navigation
     function moveApp(delta){
       if (!canInput()) return;
       const len = apps().length;
       if (len === 0) return;
       selectedIndex = (selectedIndex + delta + len) % len;
-      // if add-app is selected and it's last, it's OK
       updateSelectionUI();
     }
 
@@ -229,7 +223,7 @@
     }
 
     function deleteSelectedApp(){
-      if (circleIndex !== -1) return; // only when apps active
+      if (circleIndex !== -1) return;
       const a = apps()[selectedIndex];
       if (a && a.id !== 'add-app') {
         a.remove();
@@ -270,7 +264,6 @@
           if (url) window.open(url, '_blank');
         }
       } else {
-        // activate selected circle button
         if (circleIndex >= 0 && circleIndex < circleBtns.length) {
           circleBtns[circleIndex].click();
         }
@@ -279,21 +272,15 @@
 
     function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-    // keyboard handlers (with same debouncing)
+    // KEYBOARD
     document.addEventListener('keydown', (e) => {
-      // prevent input spam via canInput
-      if (e.repeat) {
-        // still allow movement but controlled by canInput
-      }
       if (circleIndex === -1) {
-        // apps focused
         if (e.key === 'ArrowRight') { moveApp(1); e.preventDefault(); }
         else if (e.key === 'ArrowLeft') { moveApp(-1); e.preventDefault(); }
         else if (e.key === 'ArrowDown') { switchToCircle(0); e.preventDefault(); }
         else if (e.key === 'Enter') { openSelected(); e.preventDefault(); }
         else if (e.key.toLowerCase() === 'x') { deleteSelectedApp(); e.preventDefault(); }
       } else {
-        // circle focused
         if (e.key === 'ArrowRight') { moveCircle(1); e.preventDefault(); }
         else if (e.key === 'ArrowLeft') { moveCircle(-1); e.preventDefault(); }
         else if (e.key === 'ArrowUp') { switchToApps(); e.preventDefault(); }
@@ -301,27 +288,68 @@
       }
     });
 
-    // mouse interactions for apps
+    // MOUSE / TOUCH (pointer) - apps
+    // pointerdown selects quickly; click toggles open-if-already-selected
+    launcher.addEventListener('pointerdown', (e) => {
+      const app = e.target.closest('.app');
+      if (!app) return;
+      const idx = apps().indexOf(app);
+      if (idx >= 0) {
+        // immediate visual selection on pointerdown for responsiveness
+        selectedIndex = idx;
+        circleIndex = -1;
+        updateSelectionUI();
+      }
+    }, {passive:true});
+
     launcher.addEventListener('click', (e) => {
       const app = e.target.closest('.app');
       if (!app) return;
       const idx = apps().indexOf(app);
-      if (idx >= 0) { selectedIndex = idx; circleIndex = -1; updateSelectionUI(); }
+      if (idx < 0) return;
+
+      // delete button handled separately
       if (e.target.classList.contains('delete-btn')) {
         e.stopPropagation();
-        app.remove();
+        const toDel = e.target.closest('.app');
+        toDel.remove();
         if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
+        updateSelectionUI();
+        return;
+      }
+
+      // if clicked the currently selected app -> open
+      if (circleIndex === -1 && idx === selectedIndex) {
+        openSelected();
+      } else {
+        // otherwise, just select it (already handled in pointerdown, but ensure state)
+        selectedIndex = idx;
+        circleIndex = -1;
         updateSelectionUI();
       }
     });
+
     launcher.addEventListener('dblclick', (e) => {
       const app = e.target.closest('.app');
       if (!app) return;
       const idx = apps().indexOf(app);
-      if (idx >= 0) { selectedIndex = idx; openSelected(); }
+      if (idx >= 0) {
+        selectedIndex = idx;
+        openSelected();
+      }
     });
 
-    // bottom circle buttons actions
+    // MOUSE / TOUCH - bottom circle buttons: pointerdown selects, click activates
+    circleBtns.forEach((btn, i) => {
+      btn.addEventListener('pointerdown', (e) => {
+        // select immediately
+        circleIndex = i;
+        updateSelectionUI();
+      }, {passive:true});
+      // click executes action (handlers below already set)
+    });
+
+    // bottom circle actions
     document.getElementById('btn-settings').addEventListener('click', () => {
       try { window.open('chrome://settings/', '_blank'); } catch (e) { alert('このブラウザでは開けません。'); }
     });
@@ -332,66 +360,41 @@
       alert('ｼｬｲｼｬｲｼｬｰｲ');
     });
 
-    // keyboard support on buttons (Enter/Space)
+    // keyboard ENTER/SPACE support on circle buttons
     circleBtns.forEach(btn => {
       btn.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
       });
     });
 
-    // GAMEPAD polling (sticks + dpad + buttons)
+    // GAMEPAD poll (sticks + dpad + buttons)
     function pollGamepad(){
       const gpList = navigator.getGamepads && navigator.getGamepads();
       const gp = gpList ? gpList[0] : null;
       if (gp) {
         const buttons = gp.buttons.map(b => b.pressed);
-        const axes = gp.axes.slice(0,4); // we only need first two axes reliably
+        const axes = gp.axes.slice(0,4);
 
-        // buttons: A=0, B=1, X=2, Y=3, dpad: up=12 down=13 left=14 right=15
-        // handle transitions (edge detection)
-        // D-PAD right/left/up/down
-        if (buttons[15] && !gpPrevButtons[15]) { // dpad right
-          if (circleIndex === -1) moveApp(1); else moveCircle(1);
-        }
-        if (buttons[14] && !gpPrevButtons[14]) { // dpad left
-          if (circleIndex === -1) moveApp(-1); else moveCircle(-1);
-        }
-        if (buttons[13] && !gpPrevButtons[13]) { // dpad down
-          switchToCircle(0);
-        }
-        if (buttons[12] && !gpPrevButtons[12]) { // dpad up
-          switchToApps();
-        }
+        // dpad
+        if (buttons[15] && !gpPrevButtons[15]) { if (circleIndex === -1) moveApp(1); else moveCircle(1); }
+        if (buttons[14] && !gpPrevButtons[14]) { if (circleIndex === -1) moveApp(-1); else moveCircle(-1); }
+        if (buttons[13] && !gpPrevButtons[13]) { switchToCircle(0); }
+        if (buttons[12] && !gpPrevButtons[12]) { switchToApps(); }
 
-        // stick horizontal (axes[0]) with edge detection flags in gpPrevAxes
-        if (axes[0] > AXIS_THRESHOLD && gpPrevAxes[0] <= AXIS_THRESHOLD) {
-          if (circleIndex === -1) moveApp(1); else moveCircle(1);
-        } else if (axes[0] < -AXIS_THRESHOLD && gpPrevAxes[0] >= -AXIS_THRESHOLD) {
-          if (circleIndex === -1) moveApp(-1); else moveCircle(-1);
-        }
+        // sticks (horizontal)
+        if (axes[0] > AXIS_THRESHOLD && gpPrevAxes[0] <= AXIS_THRESHOLD) { if (circleIndex === -1) moveApp(1); else moveCircle(1); }
+        else if (axes[0] < -AXIS_THRESHOLD && gpPrevAxes[0] >= -AXIS_THRESHOLD) { if (circleIndex === -1) moveApp(-1); else moveCircle(-1); }
 
-        // stick vertical for switching rows (axes[1])
-        if (axes[1] > AXIS_THRESHOLD && gpPrevAxes[1] <= AXIS_THRESHOLD) {
-          switchToCircle(0);
-        } else if (axes[1] < -AXIS_THRESHOLD && gpPrevAxes[1] >= -AXIS_THRESHOLD) {
-          switchToApps();
-        }
+        // sticks (vertical)
+        if (axes[1] > AXIS_THRESHOLD && gpPrevAxes[1] <= AXIS_THRESHOLD) { switchToCircle(0); }
+        else if (axes[1] < -AXIS_THRESHOLD && gpPrevAxes[1] >= -AXIS_THRESHOLD) { switchToApps(); }
 
-        // Buttons for actions
-        if (buttons[0] && !gpPrevButtons[0]) { // A
-          openSelected();
-        }
-        if (buttons[2] && !gpPrevButtons[2]) { // X: delete
-          deleteSelectedApp();
-        }
-        if (buttons[3] && !gpPrevButtons[3]) { // Y: jump to bottom
-          switchToCircle(0);
-        }
-        if (buttons[1] && !gpPrevButtons[1]) { // B: go back to apps
-          switchToApps();
-        }
+        // buttons
+        if (buttons[0] && !gpPrevButtons[0]) { openSelected(); } // A
+        if (buttons[2] && !gpPrevButtons[2]) { deleteSelectedApp(); } // X
+        if (buttons[3] && !gpPrevButtons[3]) { switchToCircle(0); } // Y
+        if (buttons[1] && !gpPrevButtons[1]) { switchToApps(); } // B
 
-        // save previous state
         gpPrevButtons = buttons;
         gpPrevAxes[0] = axes[0];
         gpPrevAxes[1] = axes[1];
@@ -414,7 +417,6 @@
     // init
     updateSelectionUI();
     window.addEventListener('resize', ()=>{ setTimeout(()=>scrollSelectedIntoView(), 80); });
-
   </script>
 </body>
 </html>
