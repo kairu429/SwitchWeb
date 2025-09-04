@@ -1,398 +1,290 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8" />
-  <title>Switch風 Webランチャー — 丸アイコンメニュー付き</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    :root{
-      --bg1:#0d0d0d;
-      --bg2:#1a1a1a;
-      --accent:#00bfff;
-      --icon-size:140px;
-      --gap:50px;
-      --circle-size:64px;
-    }
-    html,body{height:100%;margin:0;}
-    body{
-      background: linear-gradient(180deg,var(--bg1),var(--bg2));
-      color:#fff;
-      font-family:"Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial;
-      display:flex;
-      flex-direction:column;
-      overflow:hidden;
-    }
+<meta charset="utf-8">
+<title>Switch風 Webランチャー — 丸アイコンメニュー対応</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{
+  --bg1:#0d0d0d;
+  --bg2:#1a1a1a;
+  --accent:#00bfff;
+  --icon-size:140px;
+  --gap:50px;
+  --circle-size:64px;
+}
+html,body{height:100%;margin:0;}
+body{
+  background:linear-gradient(180deg,var(--bg1),var(--bg2));
+  color:#fff;
+  font-family:"Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  padding:10px 24px;
+  color:#cfcfcf;
+  gap:12px;
+}
+.status-right{display:flex; gap:14px; align-items:center; color:#bfbfbf;}
 
-    .topbar{
-      display:flex;
-      align-items:center;
-      justify-content:flex-end;
-      padding:10px 24px;
-      color:#cfcfcf;
-      gap:12px;
-    }
-    .status-right{display:flex; gap:14px; align-items:center; color:#bfbfbf;}
+.launcher-wrap{position:relative; flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden;}
+.launcher{
+  display:flex;
+  align-items:center;
+  overflow-x:auto;
+  gap:var(--gap);
+  padding:20px 80px;
+  scrollbar-width:none; -ms-overflow-style:none;
+}
+.launcher::-webkit-scrollbar{display:none;}
 
-    .launcher-wrap{position:relative; flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden;}
-    .launcher{
-      display:flex;
-      align-items:center;
-      overflow-x:auto;
-      gap:var(--gap);
-      padding:20px 80px;
-      scrollbar-width:none; -ms-overflow-style:none;
-    }
-    .launcher::-webkit-scrollbar{display:none;}
+.app{
+  position:relative;
+  width:var(--icon-size);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  flex-shrink:0;
+  gap:8px;
+  transition:transform .18s ease;
+}
+.app-name{
+  margin:0;
+  padding:0 6px;
+  font-size:14.5px;
+  font-weight:700;
+  color:var(--accent);
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  overflow:hidden;
+  max-width:calc(var(--icon-size)+20px);
+  opacity:0;
+  transform:translateY(-4px);
+  transition:opacity .12s ease, transform .12s ease;
+  pointer-events:none;
+}
+.icon{
+  width:var(--icon-size);
+  height:var(--icon-size);
+  border-radius:18px;
+  background:#222;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  box-shadow:0 6px 18px rgba(0,0,0,0.45);
+  transition:box-shadow .18s ease, border .12s ease;
+  position:relative;
+  z-index:1;
+}
+.icon img{width:100%;height:100%;object-fit:cover;display:block;border-radius:18px;}
+.app.selected .app-name{opacity:1; transform:translateY(0);}
+.app.selected .icon{
+  border:3px solid rgba(0,191,255,0.95);
+  box-shadow:0 8px 30px rgba(0,191,255,0.18),0 4px 10px rgba(0,0,0,0.35);
+}
+.launcher.compact .app:not(.selected){transform: translateX(-8px);}
+.delete-btn{
+  position:absolute;
+  top:-10px;
+  right:-10px;
+  width:26px;height:26px;border-radius:50%;
+  border:none;background:#ff5c5c;color:#fff;cursor:pointer;
+  display:none;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,0.4);
+  z-index:2;
+}
+.app:hover .delete-btn{display:block;}
 
-    .app{
-      position:relative;
-      width:var(--icon-size);
-      display:flex;
-      flex-direction:column; /* 名前(上) -> アイコン(下) */
-      align-items:center;
-      justify-content:flex-start;
-      flex-shrink:0;
-      gap:8px;
-      transition:transform .18s ease;
-    }
+/* 丸アイコンメニュー */
+.menu{display:flex;justify-content:center;align-items:center;gap:40px;padding:18px 12px;border-top:1px solid rgba(255,255,255,0.04);background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));}
+.circle-item{display:flex;flex-direction:column;align-items:center;gap:8px;}
+.circle-btn{
+  width:var(--circle-size);height:var(--circle-size);
+  border-radius:50%;
+  background:rgba(255,255,255,0.04);
+  display:flex;align-items:center;justify-content:center;
+  border:2px solid rgba(255,255,255,0.06);
+  cursor:pointer;transition:background .12s ease, transform .12s ease, box-shadow .12s ease;
+  color:#fff;font-weight:700;outline:none;
+}
+.circle-btn.selected{border-color:var(--accent); box-shadow:0 0 0 6px rgba(0,191,255,0.18);}
+.circle-btn:focus{box-shadow:0 0 0 6px rgba(0,191,255,0.12); transform:translateY(-3px); background:rgba(0,191,255,0.06);}
+.circle-btn:hover{transform:translateY(-3px); background:rgba(255,255,255,0.06);}
+.circle-label{font-size:13px;color:#ddd;text-align:center;user-select:none;}
 
-    .app-name{
-      margin:0;
-      padding:0 6px;
-      font-size:14.5px;
-      font-weight:700;
-      color:var(--accent);
-      white-space:nowrap;
-      text-overflow:ellipsis;
-      overflow:hidden;
-      max-width:calc(var(--icon-size) + 20px);
-      opacity:0;
-      transform:translateY(-4px);
-      transition:opacity .12s ease, transform .12s ease;
-      pointer-events:none;
-    }
-
-    .icon{
-      width:var(--icon-size);
-      height:var(--icon-size);
-      border-radius:18px;
-      background:#222;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      overflow:hidden;
-      box-shadow:0 6px 18px rgba(0,0,0,0.45);
-      transition:box-shadow .18s ease, border .12s ease;
-      position:relative;
-      z-index:1;
-    }
-    .icon img{width:100%;height:100%;object-fit:cover;display:block;border-radius:18px;}
-
-    .app.selected .app-name{ opacity:1; transform:translateY(0); }
-
-    .app.selected .icon{
-      border:3px solid rgba(0,191,255,0.95);
-      box-shadow:0 8px 30px rgba(0,191,255,0.18), 0 4px 10px rgba(0,0,0,0.35);
-    }
-
-    .launcher.compact .app:not(.selected){
-      transform: translateX(-8px);
-    }
-
-    .delete-btn{
-      position:absolute;
-      top:-10px;
-      right:-10px;
-      width:26px;height:26px;border-radius:50%;
-      border:none;background:#ff5c5c;color:#fff;cursor:pointer;
-      display:none;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,0.4);
-      z-index:2;
-    }
-    .app:hover .delete-btn{ display:block; }
-
-    /* --- 新規：丸アイコンメニュー --- */
-    .menu {
-      display:flex;
-      justify-content:center;
-      align-items:center;
-      gap:40px;
-      padding:18px 12px;
-      border-top:1px solid rgba(255,255,255,0.04);
-      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-    }
-
-    .circle-item {
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      gap:8px;
-    }
-
-    .circle-btn{
-      width:var(--circle-size);
-      height:var(--circle-size);
-      border-radius:50%;
-      background:rgba(255,255,255,0.04);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      border:2px solid rgba(255,255,255,0.06);
-      cursor:pointer;
-      transition:background .12s ease, transform .12s ease, box-shadow .12s ease;
-      color:#fff;
-      font-weight:700;
-      outline:none;
-    }
-    .circle-btn:focus{
-      box-shadow:0 0 0 6px rgba(0,191,255,0.12);
-      transform:translateY(-3px);
-      background:rgba(0,191,255,0.06);
-    }
-    .circle-btn:hover{
-      transform:translateY(-3px);
-      background:rgba(255,255,255,0.06);
-    }
-
-    .circle-label{
-      font-size:13px;
-      color:#ddd;
-      text-align:center;
-      user-select:none;
-    }
-
-    @media (max-width:900px){ :root{ --icon-size:120px; --gap:34px; --circle-size:54px; } }
-  </style>
+@media(max-width:900px){:root{--icon-size:120px;--gap:34px;--circle-size:54px;}}
+</style>
 </head>
 <body>
-  <div class="topbar">
-    <div class="status-right">
-      <div id="time"></div>
-      <div id="battery">🔋 --%</div>
+<div class="topbar">
+  <div class="status-right">
+    <div id="time"></div>
+    <div id="battery">🔋 --%</div>
+  </div>
+</div>
+
+<div class="launcher-wrap">
+  <div class="launcher" id="launcher" role="listbox" aria-label="アプリランチャー">
+    <div class="app selected" data-url="https://www.google.com" role="option" aria-selected="true">
+      <div class="app-name">Google</div>
+      <div class="icon"><img src="https://www.google.com/favicon.ico" alt="Google"></div>
+      <button class="delete-btn" title="削除">×</button>
+    </div>
+    <div class="app" data-url="https://www.youtube.com" role="option" aria-selected="false">
+      <div class="app-name">YouTube</div>
+      <div class="icon"><img src="https://www.youtube.com/favicon.ico" alt="YouTube"></div>
+      <button class="delete-btn" title="削除">×</button>
+    </div>
+    <div class="app" data-url="https://discord.com" role="option" aria-selected="false">
+      <div class="app-name">Discord</div>
+      <div class="icon"><img src="https://discord.com/favicon.ico" alt="Discord"></div>
+      <button class="delete-btn" title="削除">×</button>
+    </div>
+    <div class="app" data-url="https://github.com" role="option" aria-selected="false">
+      <div class="app-name">GitHub</div>
+      <div class="icon"><img src="https://github.com/favicon.ico" alt="GitHub"></div>
+      <button class="delete-btn" title="削除">×</button>
+    </div>
+    <div class="app" id="add-app" role="option" aria-selected="false">
+      <div class="app-name">追加</div>
+      <div class="icon">＋</div>
     </div>
   </div>
+</div>
 
-  <div class="launcher-wrap">
-    <div class="launcher" id="launcher" role="listbox" aria-label="アプリランチャー">
-      <div class="app selected" data-url="https://www.google.com" role="option" aria-selected="true">
-        <div class="app-name">Google</div>
-        <div class="icon"><img src="https://www.google.com/favicon.ico" alt="Google"></div>
-        <button class="delete-btn" title="削除">×</button>
-      </div>
-
-      <div class="app" data-url="https://www.youtube.com" role="option" aria-selected="false">
-        <div class="app-name">YouTube</div>
-        <div class="icon"><img src="https://www.youtube.com/favicon.ico" alt="YouTube"></div>
-        <button class="delete-btn" title="削除">×</button>
-      </div>
-
-      <div class="app" data-url="https://discord.com" role="option" aria-selected="false">
-        <div class="app-name">Discord</div>
-        <div class="icon"><img src="https://discord.com/favicon.ico" alt="Discord"></div>
-        <button class="delete-btn" title="削除">×</button>
-      </div>
-
-      <div class="app" data-url="https://github.com" role="option" aria-selected="false">
-        <div class="app-name">GitHub</div>
-        <div class="icon"><img src="https://github.com/favicon.ico" alt="GitHub"></div>
-        <button class="delete-btn" title="削除">×</button>
-      </div>
-
-      <div class="app" id="add-app" role="option" aria-selected="false">
-        <div class="app-name">追加</div>
-        <div class="icon">＋</div>
-      </div>
-    </div>
+<div class="menu" role="toolbar" aria-label="ランチャーメニュー">
+  <div class="circle-item">
+    <button class="circle-btn" id="btn-settings" title="設定" aria-label="設定">⚙</button>
+    <div class="circle-label">設定</div>
   </div>
-
-  <!-- 丸アイコンメニュー（ソフトの下に中央揃え） -->
-  <div class="menu" role="toolbar" aria-label="ランチャーメニュー">
-    <div class="circle-item">
-      <button class="circle-btn" id="btn-settings" title="設定 (chrome://settings/)" tabindex="0" aria-label="設定">⚙</button>
-      <div class="circle-label">設定</div>
-    </div>
-
-    <div class="circle-item">
-      <button class="circle-btn" id="btn-store" title="Chrome ウェブストア" tabindex="0" aria-label="ストア">🛒</button>
-      <div class="circle-label">ストア</div>
-    </div>
-
-    <div class="circle-item">
-      <button class="circle-btn" id="btn-power" title="電源" tabindex="0" aria-label="電源">⏻</button>
-      <div class="circle-label">電源</div>
-    </div>
+  <div class="circle-item">
+    <button class="circle-btn" id="btn-store" title="ストア" aria-label="ストア">🛒</button>
+    <div class="circle-label">ストア</div>
   </div>
+  <div class="circle-item">
+    <button class="circle-btn" id="btn-power" title="電源" aria-label="電源">⏻</button>
+    <div class="circle-label">電源</div>
+  </div>
+</div>
 
-  <script>
-    const launcher = document.getElementById('launcher');
-    let selectedIndex = 0;
-    const apps = () => Array.from(launcher.querySelectorAll('.app'));
-
-    function updateSelection(){
-      apps().forEach((app,i)=>{
-        const is = i === selectedIndex;
-        app.classList.toggle('selected', is);
-        app.setAttribute('aria-selected', is ? 'true' : 'false');
-        const nameEl = app.querySelector('.app-name');
-        if (nameEl){
-          nameEl.style.opacity = is ? '1' : '0';
-          nameEl.style.transform = is ? 'translateY(0)' : 'translateY(-4px)';
-        }
-      });
-      launcher.classList.add('compact');
-      scrollSelectedIntoView();
+<script>
+const launcher = document.getElementById('launcher');
+let selectedIndex=0;
+const apps=()=>Array.from(launcher.querySelectorAll('.app'));
+function updateSelection(){
+  apps().forEach((app,i)=>{
+    const is=i===selectedIndex;
+    app.classList.toggle('selected',is);
+    app.setAttribute('aria-selected',is?'true':'false');
+    const nameEl=app.querySelector('.app-name');
+    if(nameEl){nameEl.style.opacity=is?'1':'0'; nameEl.style.transform=is?'translateY(0)':'translateY(-4px)';}
+  });
+  launcher.classList.add('compact');
+  scrollSelectedIntoView();
+}
+function scrollSelectedIntoView(){
+  const sel=apps()[selectedIndex]; if(!sel)return;
+  const launcherRect=launcher.getBoundingClientRect();
+  const selRect=sel.getBoundingClientRect();
+  const offset=(selRect.left+selRect.right)/2-(launcherRect.left+launcherRect.right)/2;
+  launcher.scrollBy({left:offset,behavior:'smooth'});
+}
+function deleteSelectedApp(){
+  const a=apps()[selectedIndex];
+  if(a&&a.id!=='add-app'){a.remove(); if(selectedIndex>=apps().length) selectedIndex=apps().length-1; if(selectedIndex<0) selectedIndex=0; updateSelection();}
+}
+function openSelectedApp(){
+  const a=apps()[selectedIndex]; if(!a)return;
+  if(a.id==='add-app'){
+    const name=prompt('アプリ名を入力してください:');
+    const url=prompt('URLを入力してください:');
+    if(name&&url){
+      const item=document.createElement('div'); item.className='app'; item.dataset.url=url;
+      item.innerHTML=`<div class="app-name">${escapeHtml(name)}</div><div class="icon"><img src="${new URL(url).origin+'/favicon.ico'}" alt="${escapeHtml(name)}"></div><button class="delete-btn" title="削除">×</button>`;
+      item.querySelector('.delete-btn').addEventListener('click',(e)=>{e.stopPropagation(); item.remove(); if(selectedIndex>=apps().length) selectedIndex=apps().length-1; updateSelection();});
+      launcher.insertBefore(item,document.getElementById('add-app'));
+      selectedIndex=apps().indexOf(item); updateSelection();
     }
+  }else{const url=a.dataset.url; if(url)window.open(url,'_blank');}
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
-    function scrollSelectedIntoView(){
-      const sel = apps()[selectedIndex];
-      if (!sel) return;
-      const launcherRect = launcher.getBoundingClientRect();
-      const selRect = sel.getBoundingClientRect();
-      const offset = (selRect.left + selRect.right)/2 - (launcherRect.left + launcherRect.right)/2;
-      launcher.scrollBy({ left: offset, behavior: 'smooth' });
+// キーボード操作
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='ArrowRight'){ selectedIndex=(selectedIndex+1)%apps().length; updateSelection();}
+  else if(e.key==='ArrowLeft'){ selectedIndex=(selectedIndex-1+apps().length)%apps().length; updateSelection();}
+  else if(e.key==='Enter') openSelectedApp();
+  else if(e.key.toLowerCase()==='x') deleteSelectedApp();
+});
+
+// クリック/ダブルクリック
+launcher.addEventListener('click',(e)=>{
+  const app=e.target.closest('.app'); if(!app)return;
+  const idx=apps().indexOf(app); if(idx>=0){selectedIndex=idx; updateSelection();}
+  if(e.target.classList.contains('delete-btn')){ e.stopPropagation(); e.target.closest('.app').remove(); if(selectedIndex>=apps().length) selectedIndex=apps().length-1; updateSelection();}
+});
+launcher.addEventListener('dblclick',(e)=>{const app=e.target.closest('.app'); if(!app)return; const idx=apps().indexOf(app); if(idx>=0) openSelectedApp();});
+
+// ゲームパッド
+let gpState={axisLeft:false,axisRight:false,buttons:[]};
+const axisThreshold=0.5;
+const circleBtns=[...document.querySelectorAll('.circle-btn')];
+let circleIndex=-1; // -1はアプリ選択中
+function pollGamepad(){
+  const gp=navigator.getGamepads&&navigator.getGamepads()[0];
+  if(gp){
+    const buttons=gp.buttons.map(b=>b.pressed);
+    const axes=gp.axes;
+    // アプリ選択
+    if(circleIndex===-1){
+      if(buttons[15]&&!gpState.buttons[15]){ selectedIndex=(selectedIndex+1)%apps().length; updateSelection();}
+      if(buttons[14]&&!gpState.buttons[14]){ selectedIndex=(selectedIndex-1+apps().length)%apps().length; updateSelection();}
+      if(axes[0]>axisThreshold&&!gpState.axisRight){ selectedIndex=(selectedIndex+1)%apps().length; gpState.axisRight=true; updateSelection();}
+      else if(axes[0]<-axisThreshold&&!gpState.axisLeft){ selectedIndex=(selectedIndex-1+apps().length)%apps().length; gpState.axisLeft=true; updateSelection();}
+      else if(Math.abs(axes[0])<axisThreshold){ gpState.axisRight=gpState.axisLeft=false;}
+      if(buttons[0]&&!gpState.buttons[0]) openSelectedApp();
+      if(buttons[2]&&!gpState.buttons[2]) deleteSelectedApp();
+      // 下の丸アイコンに移動 (ボタンY)
+      if(buttons[3]&&!gpState.buttons[3]){ circleIndex=0; updateCircleSelection(); }
+    }else{
+      // 丸アイコン操作
+      if(buttons[15]&&!gpState.buttons[15]){ circleIndex=(circleIndex+1)%circleBtns.length; updateCircleSelection();}
+      if(buttons[14]&&!gpState.buttons[14]){ circleIndex=(circleIndex-1+circleBtns.length)%circleBtns.length; updateCircleSelection();}
+      if(buttons[0]&&!gpState.buttons[0]) circleBtns[circleIndex].click();
+      // アプリに戻る (ボタンB)
+      if(buttons[1]&&!gpState.buttons[1]){ circleIndex=-1; updateCircleSelection(); updateSelection(); }
     }
+    gpState.buttons=buttons;
+  }
+  requestAnimationFrame(pollGamepad);
+}
+function updateCircleSelection(){
+  circleBtns.forEach((btn,i)=>btn.classList.toggle('selected',i===circleIndex));
+}
+pollGamepad();
 
-    function deleteSelectedApp(){
-      const a = apps()[selectedIndex];
-      if (a && a.id !== 'add-app'){
-        a.remove();
-        if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
-        if (selectedIndex < 0) selectedIndex = 0;
-        updateSelection();
-      }
-    }
+// 丸アイコン動作
+document.getElementById('btn-settings').addEventListener('click',()=>{try{window.open('chrome://settings/','_blank');}catch(e){alert('このブラウザでは開けません。');}});
+document.getElementById('btn-store').addEventListener('click',()=>{window.open('https://www.amazon.co.jp/','_blank');});
+document.getElementById('btn-power').addEventListener('click',()=>{alert('ｼｬｲｼｬｲｼｬｰｲ');});
 
-    function openSelectedApp(){
-      const a = apps()[selectedIndex];
-      if (!a) return;
-      if (a.id === 'add-app'){
-        const name = prompt('アプリ名を入力してください:');
-        const url = prompt('URLを入力してください:');
-        if (name && url){
-          const item = document.createElement('div');
-          item.className = 'app';
-          item.dataset.url = url;
-          item.innerHTML = `
-            <div class="app-name">${escapeHtml(name)}</div>
-            <div class="icon"><img src="${new URL(url).origin + '/favicon.ico'}" alt="${escapeHtml(name)}"></div>
-            <button class="delete-btn" title="削除">×</button>
-          `;
-          item.querySelector('.delete-btn').addEventListener('click', (e)=>{
-            e.stopPropagation();
-            item.remove();
-            if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
-            updateSelection();
-          });
-          launcher.insertBefore(item, document.getElementById('add-app'));
-          selectedIndex = apps().indexOf(item);
-          updateSelection();
-        }
-      } else {
-        const url = a.dataset.url;
-        if (url) window.open(url, '_blank');
-      }
-    }
+// Enter/Space keyboard support
+circleBtns.forEach(btn=>{btn.addEventListener('keydown',(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); btn.click();}});});
 
-    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// 時間・バッテリー
+function updateTime(){document.getElementById('time').textContent=new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});}
+setInterval(updateTime,1000); updateTime();
+if(navigator.getBattery){navigator.getBattery().then(b=>{function upd(){document.getElementById('battery').textContent='🔋 '+Math.round(b.level*100)+'%';} upd(); b.addEventListener('levelchange',upd);});}
 
-    // keyboard navigation for launcher
-    document.addEventListener('keydown', (e)=>{
-      if (e.key === 'ArrowRight'){ selectedIndex = (selectedIndex + 1) % apps().length; updateSelection(); }
-      else if (e.key === 'ArrowLeft'){ selectedIndex = (selectedIndex - 1 + apps().length) % apps().length; updateSelection(); }
-      else if (e.key === 'Enter') openSelectedApp();
-      else if (e.key.toLowerCase() === 'x') deleteSelectedApp();
-    });
-
-    // click/dblclick and delete button
-    launcher.addEventListener('click', (e)=>{
-      const app = e.target.closest('.app');
-      if (!app) return;
-      const idx = apps().indexOf(app);
-      if (idx >= 0){ selectedIndex = idx; updateSelection(); }
-      if (e.target.classList.contains('delete-btn')){
-        e.stopPropagation();
-        const appToDel = e.target.closest('.app');
-        appToDel.remove();
-        if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
-        updateSelection();
-      }
-    });
-    launcher.addEventListener('dblclick', (e)=>{
-      const app = e.target.closest('.app');
-      if (!app) return;
-      const idx = apps().indexOf(app);
-      if (idx >= 0){ selectedIndex = idx; openSelectedApp(); }
-    });
-
-    // gamepad
-    let gpState={axisLeft:false,axisRight:false,buttons:[]};
-    const axisThreshold=0.5;
-    function pollGamepad(){
-      const gp = navigator.getGamepads && navigator.getGamepads()[0];
-      if (gp){
-        const buttons = gp.buttons.map(b=>b.pressed);
-        const axes = gp.axes;
-        if (buttons[15] && !gpState.buttons[15]){ selectedIndex=(selectedIndex+1)%apps().length; updateSelection(); }
-        if (buttons[14] && !gpState.buttons[14]){ selectedIndex=(selectedIndex-1+apps().length)%apps().length; updateSelection(); }
-        if (axes[0] > axisThreshold && !gpState.axisRight){ selectedIndex=(selectedIndex+1)%apps().length; gpState.axisRight=true; updateSelection(); }
-        else if (axes[0] < -axisThreshold && !gpState.axisLeft){ selectedIndex=(selectedIndex-1+apps().length)%apps().length; gpState.axisLeft=true; updateSelection(); }
-        else if (Math.abs(axes[0]) < axisThreshold){ gpState.axisRight = gpState.axisLeft = false; }
-        if (buttons[0] && !gpState.buttons[0]) openSelectedApp();
-        if (buttons[2] && !gpState.buttons[2]) deleteSelectedApp();
-        gpState.buttons = buttons;
-      }
-      requestAnimationFrame(pollGamepad);
-    }
-    pollGamepad();
-
-    // --- 新規：丸アイコンメニューの動作 ---
-    const btnSettings = document.getElementById('btn-settings');
-    const btnStore = document.getElementById('btn-store');
-    const btnPower = document.getElementById('btn-power');
-
-    btnSettings.addEventListener('click', ()=> {
-      // ブラウザによってはchrome:// への新規タブオープンをブロックします。
-      try { window.open('chrome://settings/','_blank'); }
-      catch(e){ alert('このブラウザでは chrome://settings/ を開けません。'); }
-    });
-    btnStore.addEventListener('click', ()=> {
-      window.open('https://chromewebstore.google.com/','_blank');
-    });
-    btnPower.addEventListener('click', ()=> {
-      alert('ｼｬｲｼｬｲｼｬｰｲ');
-    });
-
-    // keyboard support for circle buttons (Enter/Space)
-    [btnSettings, btnStore, btnPower].forEach(btn=>{
-      btn.addEventListener('keydown', (e)=>{
-        if (e.key === 'Enter' || e.key === ' '){
-          e.preventDefault();
-          btn.click();
-        }
-      });
-    });
-
-    // time & battery
-    function updateTime(){ document.getElementById('time').textContent=new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}); }
-    setInterval(updateTime,1000); updateTime();
-    if (navigator.getBattery){
-      navigator.getBattery().then(b=>{
-        function upd(){ document.getElementById('battery').textContent='🔋 '+Math.round(b.level*100)+'%'; }
-        upd(); b.addEventListener('levelchange',upd);
-      });
-    }
-
-    // init
-    updateSelection();
-    window.addEventListener('resize', ()=>{ setTimeout(()=>scrollSelectedIntoView(), 80); });
-
-    function scrollSelectedIntoView(){
-      const sel = apps()[selectedIndex];
-      if (!sel) return;
-      const launcherRect = launcher.getBoundingClientRect();
-      const selRect = sel.getBoundingClientRect();
-      const offset = (selRect.left + selRect.right)/2 - (launcherRect.left + launcherRect.right)/2;
-      launcher.scrollBy({ left: offset, behavior: 'smooth' });
-    }
-  </script>
+// 初期
+updateSelection();
+window.addEventListener('resize',()=>{setTimeout(()=>scrollSelectedIntoView(),80);});
+</script>
 </body>
 </html>
