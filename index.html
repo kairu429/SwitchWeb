@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>Switch風 Webランチャー</title>
+  <title>Switch風 Webランチャー — ホバーで選択同期版</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root{
@@ -38,7 +38,7 @@
     .app{
       position:relative; width:var(--icon-size); display:flex; flex-direction:column; align-items:center;
       justify-content:flex-start; flex-shrink:0; gap:8px; transition:transform .18s ease;
-      touch-action: manipulation; /* for better touch behaviour */
+      touch-action: manipulation;
     }
     .app-name{
       margin:0; padding:0 6px; font-size:14.5px; font-weight:700; color:var(--accent);
@@ -159,7 +159,6 @@
     // Gamepad state to detect edges
     let gpPrevButtons = [];
     let gpPrevAxes = [0,0];
-
     const AXIS_THRESHOLD = 0.5;
 
     function now() { return performance.now(); }
@@ -249,6 +248,7 @@
               <div class="icon"><img src="${new URL(url).origin + '/favicon.ico'}" alt="${escapeHtml(name)}"></div>
               <button class="delete-btn" title="削除">×</button>
             `;
+            bindAppPointerHandlers(item); // bind hover handlers for new item
             item.querySelector('.delete-btn').addEventListener('click', (e) => {
               e.stopPropagation();
               item.remove();
@@ -264,6 +264,7 @@
           if (url) window.open(url, '_blank');
         }
       } else {
+        // activate selected circle button
         if (circleIndex >= 0 && circleIndex < circleBtns.length) {
           circleBtns[circleIndex].click();
         }
@@ -288,14 +289,14 @@
       }
     });
 
-    // MOUSE / TOUCH (pointer) - apps
-    // pointerdown selects quickly; click toggles open-if-already-selected
+    // MOUSE / TOUCH / POINTER - apps
+    // pointerdown selects quickly; click opens if already selected
     launcher.addEventListener('pointerdown', (e) => {
       const app = e.target.closest('.app');
       if (!app) return;
       const idx = apps().indexOf(app);
       if (idx >= 0) {
-        // immediate visual selection on pointerdown for responsiveness
+        // immediate selection on pointerdown for responsiveness
         selectedIndex = idx;
         circleIndex = -1;
         updateSelectionUI();
@@ -308,7 +309,7 @@
       const idx = apps().indexOf(app);
       if (idx < 0) return;
 
-      // delete button handled separately
+      // delete button
       if (e.target.classList.contains('delete-btn')) {
         e.stopPropagation();
         const toDel = e.target.closest('.app');
@@ -322,7 +323,7 @@
       if (circleIndex === -1 && idx === selectedIndex) {
         openSelected();
       } else {
-        // otherwise, just select it (already handled in pointerdown, but ensure state)
+        // otherwise, just select it
         selectedIndex = idx;
         circleIndex = -1;
         updateSelectionUI();
@@ -339,17 +340,41 @@
       }
     });
 
-    // MOUSE / TOUCH - bottom circle buttons: pointerdown selects, click activates
+    // --- NEW: hover (pointerenter) handlers for apps & circle buttons ---
+    function bindAppPointerHandlers(appEl){
+      // pointerenter for hover selection — only react to mouse hovers
+      appEl.addEventListener('pointerenter', (ev) => {
+        if (ev.pointerType === 'mouse') {
+          const idx = apps().indexOf(appEl);
+          if (idx >= 0) {
+            selectedIndex = idx;
+            circleIndex = -1;
+            updateSelectionUI();
+          }
+        }
+      });
+      // optional: pointerleave no-op (we keep selection until something else selects)
+    }
+
+    // bind for existing apps
+    apps().forEach(bindAppPointerHandlers);
+
+    // bind pointer handlers for circle buttons
     circleBtns.forEach((btn, i) => {
-      btn.addEventListener('pointerdown', (e) => {
-        // select immediately
+      btn.addEventListener('pointerenter', (ev) => {
+        if (ev.pointerType === 'mouse') {
+          circleIndex = i;
+          updateSelectionUI();
+        }
+      }, {passive:true});
+      // pointerdown selects immediately (already handled by pointerdown listeners on buttons via default)
+      btn.addEventListener('pointerdown', (ev) => {
         circleIndex = i;
         updateSelectionUI();
       }, {passive:true});
-      // click executes action (handlers below already set)
     });
 
-    // bottom circle actions
+    // MOUSE / TOUCH - bottom circle actions
     document.getElementById('btn-settings').addEventListener('click', () => {
       try { window.open('chrome://settings/', '_blank'); } catch (e) { alert('このブラウザでは開けません。'); }
     });
@@ -360,7 +385,7 @@
       alert('ｼｬｲｼｬｲｼｬｰｲ');
     });
 
-    // keyboard ENTER/SPACE support on circle buttons
+    // keyboard support for circle buttons (Enter/Space)
     circleBtns.forEach(btn => {
       btn.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
