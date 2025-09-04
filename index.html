@@ -29,8 +29,8 @@
       display: flex;
       align-items: center;
       overflow-x: auto;
-      padding: 15px 60px 15px 30px; /* 左右に余白を追加 */
-      gap: 50px; /* アイコン間隔を少し広く */
+      padding: 15px 60px 15px 30px; 
+      gap: 50px; 
       flex-grow: 1;
     }
 
@@ -41,8 +41,8 @@
     }
 
     .icon {
-      width: 140px;  /* 少し大きく */
-      height: 140px; /* 少し大きく */
+      width: 140px;  
+      height: 140px; 
       border-radius: 18px; 
       background: #333;
       display: flex;
@@ -62,14 +62,15 @@
     }
 
     .app-name {
-      margin-top: 8px;
+      margin-bottom: 8px;
       font-size: 17px;
-      opacity: 0.9;
+      color: #00bfff; /* 水色 */
+      font-weight: bold;
     }
 
     .selected .icon {
       transform: scale(1.25);
-      box-shadow: 0 0 28px rgba(255,255,255,0.7);
+      box-shadow: 0 0 28px rgba(0,191,255,0.7);
     }
 
     .delete-btn {
@@ -94,7 +95,7 @@
     .menu {
       display: flex;
       justify-content: center;
-      gap: 35px; /* 少し広め */
+      gap: 35px; 
       padding: 12px;
       border-top: 1px solid #444;
     }
@@ -118,24 +119,28 @@
 
   <div class="launcher" id="launcher">
     <div class="app selected" data-url="https://www.google.com">
-      <div class="icon"><img src="https://www.google.com/favicon.ico"></div>
       <div class="app-name">Google</div>
+      <div class="icon"><img src="https://www.google.com/favicon.ico"></div>
+      <button class="delete-btn">×</button>
     </div>
     <div class="app" data-url="https://www.youtube.com">
-      <div class="icon"><img src="https://www.youtube.com/favicon.ico"></div>
       <div class="app-name">YouTube</div>
+      <div class="icon"><img src="https://www.youtube.com/favicon.ico"></div>
+      <button class="delete-btn">×</button>
     </div>
     <div class="app" data-url="https://discord.com">
-      <div class="icon"><img src="https://discord.com/favicon.ico"></div>
       <div class="app-name">Discord</div>
+      <div class="icon"><img src="https://discord.com/favicon.ico"></div>
+      <button class="delete-btn">×</button>
     </div>
     <div class="app" data-url="https://github.com">
-      <div class="icon"><img src="https://github.com/favicon.ico"></div>
       <div class="app-name">GitHub</div>
+      <div class="icon"><img src="https://github.com/favicon.ico"></div>
+      <button class="delete-btn">×</button>
     </div>
     <div class="app" id="add-app">
-      <div class="icon">＋</div>
       <div class="app-name">追加</div>
+      <div class="icon">＋</div>
     </div>
   </div>
 
@@ -176,9 +181,9 @@
           app.className = "app";
           app.dataset.url = url;
           app.innerHTML = `
-            <button class="delete-btn">×</button>
-            <div class="icon"><img src="${new URL(url).origin + "/favicon.ico"}" alt="${name}"></div>
             <div class="app-name">${name}</div>
+            <div class="icon"><img src="${new URL(url).origin + "/favicon.ico"}" alt="${name}"></div>
+            <button class="delete-btn">×</button>
           `;
           app.querySelector(".delete-btn").addEventListener("click", (e) => {
             e.stopPropagation();
@@ -198,49 +203,56 @@
     }
 
     document.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowRight") {
-        selectedIndex = (selectedIndex + 1) % apps.length;
-        updateSelection();
-      } else if (e.key === "ArrowLeft") {
-        selectedIndex = (selectedIndex - 1 + apps.length) % apps.length;
-        updateSelection();
-      } else if (e.key === "Enter") {
-        openSelectedApp();
-      } else if (e.key.toLowerCase() === "x") {
-        deleteSelectedApp();
-      }
+      if (e.key === "ArrowRight") selectedIndex = (selectedIndex + 1) % apps.length;
+      else if (e.key === "ArrowLeft") selectedIndex = (selectedIndex - 1 + apps.length) % apps.length;
+      else if (e.key === "Enter") openSelectedApp();
+      else if (e.key.toLowerCase() === "x") deleteSelectedApp();
+      updateSelection();
     });
 
-    let lastGamepadState = {};
+    // ゲームパッド対応（左右スティック + 十字キー）
+    let lastState = {};
+    const threshold = 0.5;
+
     function pollGamepad() {
-      const gamepads = navigator.getGamepads();
-      if (gamepads[0]) {
-        const gp = gamepads[0];
+      const gp = navigator.getGamepads()[0];
+      if (gp) {
         const buttons = gp.buttons.map(b => b.pressed);
+        const axes = gp.axes;
 
-        if (buttons[15] && !lastGamepadState[15]) selectedIndex = (selectedIndex + 1) % apps.length;
-        if (buttons[14] && !lastGamepadState[14]) selectedIndex = (selectedIndex - 1 + apps.length) % apps.length;
-        if (buttons[0] && !lastGamepadState[0]) openSelectedApp();
-        if (buttons[2] && !lastGamepadState[2]) deleteSelectedApp();
+        // 十字キー
+        if (buttons[15] && !lastState[15]) selectedIndex = (selectedIndex + 1) % apps.length;
+        if (buttons[14] && !lastState[14]) selectedIndex = (selectedIndex - 1 + apps.length) % apps.length;
 
+        // 左スティック横
+        if (axes[0] > threshold && !lastState.axisRight) { selectedIndex = (selectedIndex + 1) % apps.length; lastState.axisRight = true; }
+        else if (axes[0] < -threshold && !lastState.axisLeft) { selectedIndex = (selectedIndex - 1 + apps.length) % apps.length; lastState.axisLeft = true; }
+        else if (Math.abs(axes[0]) < threshold) { lastState.axisRight = false; lastState.axisLeft = false; }
+
+        // Aボタンで開く、Xボタンで削除
+        if (buttons[0] && !lastState[0]) openSelectedApp();
+        if (buttons[2] && !lastState[2]) deleteSelectedApp();
+
+        lastState.buttons = buttons;
         updateSelection();
-        lastGamepadState = buttons;
       }
       requestAnimationFrame(pollGamepad);
     }
     pollGamepad();
 
+    // 時間表示
     function updateTime() {
       const now = new Date();
-      document.getElementById("time").textContent = now.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+      document.getElementById("time").textContent = now.toLocaleTimeString("ja-JP",{ hour: "2-digit", minute: "2-digit"});
     }
     setInterval(updateTime, 1000);
     updateTime();
 
+    // バッテリー表示
     if (navigator.getBattery) {
       navigator.getBattery().then(battery => {
         function updateBattery() {
-          document.getElementById("battery").textContent = "🔋 " + Math.round(battery.level * 100) + "%";
+          document.getElementById("battery").textContent = "🔋 " + Math.round(battery.level*100) + "%";
         }
         updateBattery();
         battery.addEventListener("levelchange", updateBattery);
