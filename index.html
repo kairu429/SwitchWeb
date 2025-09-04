@@ -7,211 +7,191 @@
     body {
       margin: 0;
       height: 100vh;
-      background: linear-gradient(180deg, #2c2c2c, #1a1a1a);
+      background: linear-gradient(180deg, #0d0d0d, #1a1a1a);
       color: white;
       font-family: "Segoe UI", sans-serif;
       display: flex;
       flex-direction: column;
+      justify-content: space-between;
       overflow: hidden;
     }
-    .main-area {
+
+    /* ステータスバー */
+    .status-bar {
       display: flex;
-      flex-grow: 1;
-      padding: 80px 40px;
-      overflow: hidden;
-      align-items: center;
-      gap: 60px;
+      justify-content: flex-end;
+      padding: 10px 20px;
+      font-size: 14px;
+      gap: 20px;
+      color: #ccc;
     }
+
+    /* アイコン並び */
     .launcher {
       display: flex;
+      align-items: center;
+      overflow-x: auto;
+      padding: 20px;
       gap: 40px;
-      overflow: hidden;
       flex-grow: 1;
-      align-items: center;
     }
+
     .app {
+      text-align: center;
       flex-shrink: 0;
-      width: 160px;
-      height: 160px;
+    }
+
+    .icon {
+      width: 120px;
+      height: 120px;
+      border-radius: 20px;
       background: #333;
-      border-radius: 25px;
       display: flex;
-      align-items: center;
       justify-content: center;
+      align-items: center;
+      font-size: 24px;
       transition: transform 0.3s, box-shadow 0.3s;
       cursor: pointer;
-      position: relative;
     }
-    .app img {
-      width: 96px;
-      height: 96px;
-      border-radius: 15%;
-    }
-    .app.focused {
-      transform: scale(1.3);
-      box-shadow: 0 0 25px rgba(255,255,255,0.6);
-      z-index: 10;
-    }
-    .ui-bar {
-      height: 60px;
-      background: rgba(0,0,0,0.6);
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      padding: 0 20px;
+
+    .app-name {
+      margin-top: 10px;
       font-size: 14px;
+      opacity: 0.9;
     }
-    .add-url {
+
+    .selected .icon {
+      transform: scale(1.2);
+      box-shadow: 0 0 20px rgba(255,255,255,0.7);
+    }
+
+    /* 下部メニュー */
+    .menu {
       display: flex;
-      flex-direction: column;
-      gap: 10px;
-      min-width: 200px;
+      justify-content: center;
+      gap: 40px;
+      padding: 15px;
+      border-top: 1px solid #444;
     }
-    .add-url input {
-      padding: 8px;
-      border-radius: 8px;
-      border: none;
-      outline: none;
-      font-size: 14px;
-    }
-    .add-url button {
-      padding: 8px;
-      border-radius: 8px;
-      border: none;
-      background: #4a90e2;
-      color: white;
-      font-weight: bold;
+
+    .menu-item {
       cursor: pointer;
-      transition: background 0.2s;
+      font-size: 14px;
+      opacity: 0.8;
+      transition: opacity 0.2s;
     }
-    .add-url button:hover {
-      background: #357ab8;
+    .menu-item:hover {
+      opacity: 1;
     }
   </style>
 </head>
 <body>
-  <div class="main-area">
-    <div class="launcher" id="launcher"></div>
-    <div class="add-url">
-      <input type="text" id="newUrl" placeholder="URLを追加">
-      <button id="addBtn">追加</button>
+  <!-- ステータスバー -->
+  <div class="status-bar">
+    <div id="time"></div>
+    <div id="battery">🔋 --%</div>
+  </div>
+
+  <!-- アイコン -->
+  <div class="launcher" id="launcher">
+    <div class="app selected" data-url="https://www.google.com">
+      <div class="icon">🌐</div>
+      <div class="app-name">Google</div>
+    </div>
+    <div class="app" data-url="https://www.youtube.com">
+      <div class="icon">▶️</div>
+      <div class="app-name">YouTube</div>
+    </div>
+    <div class="app" data-url="https://discord.com">
+      <div class="icon">💬</div>
+      <div class="app-name">Discord</div>
+    </div>
+    <div class="app" data-url="https://github.com">
+      <div class="icon">🐙</div>
+      <div class="app-name">GitHub</div>
     </div>
   </div>
 
-  <div class="ui-bar">
-    <span id="time"></span>
+  <!-- 下部メニュー -->
+  <div class="menu">
+    <div class="menu-item">設定</div>
+    <div class="menu-item">ストア</div>
+    <div class="menu-item">電源</div>
   </div>
 
   <script>
-    const launcher = document.getElementById("launcher");
-    const timeLabel = document.getElementById("time");
-    const addBtn = document.getElementById("addBtn");
-    const newUrlInput = document.getElementById("newUrl");
-
-    let apps = JSON.parse(localStorage.getItem("apps")) || [
-      "https://youtube.com",
-      "https://twitter.com",
-      "https://github.com",
-      "https://netflix.com",
-      "https://openai.com",
-      "https://amazon.co.jp"
-    ];
-
+    const apps = document.querySelectorAll(".app");
     let selectedIndex = 0;
 
-    function getFavicon(url) {
-      try {
-        const domain = new URL(url).hostname;
-        return `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
-      } catch {
-        return "https://via.placeholder.com/96";
-      }
-    }
-
-    function renderApps() {
-      launcher.innerHTML = "";
+    function updateSelection() {
       apps.forEach((app, i) => {
-        const div = document.createElement("div");
-        div.className = "app" + (i === selectedIndex ? " focused" : "");
-        div.innerHTML = `<img src="${getFavicon(app)}" alt="icon">`;
-        div.onclick = () => window.open(app, "_blank");
-        launcher.appendChild(div);
-      });
-      updateView();
-    }
-
-    function updateFocus() {
-      const appDivs = document.querySelectorAll(".app");
-      appDivs.forEach((el, i) => {
-        el.classList.toggle("focused", i === selectedIndex);
+        app.classList.toggle("selected", i === selectedIndex);
       });
     }
 
-    function updateView() {
-      const appDivs = document.querySelectorAll(".app");
-      if (!appDivs[selectedIndex]) return;
-      const selected = appDivs[selectedIndex];
-
-      const offset = selected.offsetLeft - launcher.clientWidth / 3;
-      launcher.scrollTo({ left: offset, behavior: "smooth" });
-    }
-
-    function moveSelection(dir) {
-      selectedIndex += dir;
-      if (selectedIndex < 0) selectedIndex = 0;
-      if (selectedIndex >= apps.length) selectedIndex = apps.length - 1;
-      updateFocus();
-      updateView();
+    function openSelectedApp() {
+      const url = apps[selectedIndex].dataset.url;
+      if (url) window.open(url, "_blank");
     }
 
     // キーボード操作
-    window.addEventListener("keydown", e => {
-      if (e.key === "ArrowRight") moveSelection(1);
-      if (e.key === "ArrowLeft") moveSelection(-1);
-      if (e.key === "Enter") window.open(apps[selectedIndex], "_blank");
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") {
+        selectedIndex = (selectedIndex + 1) % apps.length;
+        updateSelection();
+      } else if (e.key === "ArrowLeft") {
+        selectedIndex = (selectedIndex - 1 + apps.length) % apps.length;
+        updateSelection();
+      } else if (e.key === "Enter") {
+        openSelectedApp();
+      }
     });
 
-    // コントローラー操作（Gamepad API）
-    let lastMoveTime = 0;
-    function gamepadLoop() {
-      const now = performance.now();
+    // XBOXコントローラー対応
+    let lastGamepadState = {};
+    function pollGamepad() {
       const gamepads = navigator.getGamepads();
       if (gamepads[0]) {
         const gp = gamepads[0];
+        const buttons = gp.buttons.map(b => b.pressed);
 
-        if (gp.buttons[15]?.pressed && now - lastMoveTime > 200) {  // →ボタン
-          moveSelection(1);
-          lastMoveTime = now;
+        if (buttons[15] && !lastGamepadState[15]) { // →
+          selectedIndex = (selectedIndex + 1) % apps.length;
+          updateSelection();
         }
-        if (gp.buttons[14]?.pressed && now - lastMoveTime > 200) { // ←ボタン
-          moveSelection(-1);
-          lastMoveTime = now;
+        if (buttons[14] && !lastGamepadState[14]) { // ←
+          selectedIndex = (selectedIndex - 1 + apps.length) % apps.length;
+          updateSelection();
         }
-        if (gp.buttons[0]?.pressed) window.open(apps[selectedIndex], "_blank"); // Aボタン
+        if (buttons[0] && !lastGamepadState[0]) { // A
+          openSelectedApp();
+        }
+        lastGamepadState = buttons;
       }
-      requestAnimationFrame(gamepadLoop);
+      requestAnimationFrame(pollGamepad);
     }
-    gamepadLoop();
+    pollGamepad();
 
-    // 時計
+    // 時刻更新
     function updateTime() {
       const now = new Date();
-      timeLabel.textContent = now.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
+      document.getElementById("time").textContent =
+        now.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
     }
     setInterval(updateTime, 1000);
     updateTime();
 
-    // URL追加
-    addBtn.onclick = () => {
-      const url = newUrlInput.value.trim();
-      if (!url) return;
-      apps.push(url);
-      localStorage.setItem("apps", JSON.stringify(apps));
-      newUrlInput.value = "";
-      renderApps();
-    };
-
-    renderApps();
+    // バッテリー情報
+    if (navigator.getBattery) {
+      navigator.getBattery().then(battery => {
+        function updateBattery() {
+          document.getElementById("battery").textContent =
+            "🔋 " + Math.round(battery.level * 100) + "%";
+        }
+        updateBattery();
+        battery.addEventListener("levelchange", updateBattery);
+      });
+    }
   </script>
 </body>
 </html>
