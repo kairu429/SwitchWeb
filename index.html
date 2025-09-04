@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>Switch風 Webランチャー — 選択名は選択中のみ表示（確実版）</title>
+  <title>Switch風 Webランチャー</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root{
@@ -21,18 +21,16 @@
       display:flex;
       flex-direction:column;
       overflow:hidden;
-      -webkit-font-smoothing:antialiased;
-      -moz-osx-font-smoothing:grayscale;
     }
 
     .topbar{
       display:flex;
-      align-items:center;
       justify-content:flex-end;
       padding:10px 24px;
       color:#cfcfcf;
       gap:12px;
     }
+
     .status-right{display:flex; gap:14px; align-items:center; color:#bfbfbf;}
 
     .launcher-wrap{position:relative; flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden;}
@@ -42,7 +40,6 @@
       overflow-x:auto;
       gap:var(--gap);
       padding:20px 80px;
-      transition:transform .18s ease;
       scrollbar-width:none; -ms-overflow-style:none;
     }
     .launcher::-webkit-scrollbar{display:none;}
@@ -53,7 +50,7 @@
       display:flex;
       flex-direction:column;
       align-items:center;
-      justify-content:flex-end;
+      justify-content:center;
       flex-shrink:0;
       transition:transform .18s ease;
     }
@@ -74,11 +71,14 @@
     }
     .icon img{width:100%;height:100%;object-fit:cover;display:block;border-radius:18px;}
 
-    /* 名前はアイコンの上に固定。CSSで非表示にして JS で確実に切り替える */
+    /* 選択中のみ青文字 */
     .app-name{
       position:absolute;
-      top:-28px; /* アイコンの少し上 */
-      width:100%;
+      top:calc(-1.2 * var(--icon-size));
+      left:50%;
+      transform:translateX(-50%) translateY(-2px);
+      width:max-content;
+      max-width:200px;
       text-align:center;
       font-size:14.5px;
       font-weight:700;
@@ -86,18 +86,19 @@
       pointer-events:none;
       white-space:nowrap;
       opacity:0;
-      transform:translateY(-2px);
       transition:opacity .12s ease, transform .12s ease;
     }
+    .app.selected .app-name{
+      opacity:1;
+      transform:translateX(-50%) translateY(0);
+    }
 
-    /* 選択時の枠（拡大しない） */
+    /* 選択時の枠 */
     .app.selected .icon{
       border:3px solid rgba(0,191,255,0.95);
       box-shadow:0 8px 30px rgba(0,191,255,0.18), 0 4px 10px rgba(0,0,0,0.35);
-      transform:none;
     }
 
-    /* launcher.compact を付ければ非選択アイコンを少し左へ詰める */
     .launcher.compact .app:not(.selected){
       transform: translateX(-8px);
     }
@@ -179,25 +180,13 @@
 
     const apps = () => Array.from(launcher.querySelectorAll('.app'));
 
-    // updateSelection: class と aria-selected を切り替え、かつ app-name の表示を JS 側でも確実に切り替える
     function updateSelection(){
       apps().forEach((app,i)=>{
         const is = i === selectedIndex;
         app.classList.toggle('selected', is);
         app.setAttribute('aria-selected', is ? 'true' : 'false');
-
-        // CSS のみでも動くが、JSで直接 opacity を制御して「確実に」表示/非表示にする
-        const nameEl = app.querySelector('.app-name');
-        if (nameEl){
-          nameEl.style.opacity = is ? '1' : '0';
-          nameEl.style.transform = is ? 'translateY(0)' : 'translateY(-2px)';
-        }
       });
-
-      // 非選択を少し左へ詰めるビヘイビアを常に付ける（見た目の効果）
-      launcher.classList.add('compact');
-
-      // 選択中を中央にスクロール
+      launcher.classList.toggle('compact', true);
       scrollSelectedIntoView();
     }
 
@@ -206,13 +195,13 @@
       if (!sel) return;
       const launcherRect = launcher.getBoundingClientRect();
       const selRect = sel.getBoundingClientRect();
-      const offset = (selRect.left + selRect.right) / 2 - (launcherRect.left + launcherRect.right) / 2;
+      const offset = (selRect.left + selRect.right)/2 - (launcherRect.left + launcherRect.right)/2;
       launcher.scrollBy({ left: offset, behavior: 'smooth' });
     }
 
     function deleteSelectedApp(){
       const a = apps()[selectedIndex];
-      if (a && a.id !== 'add-app'){
+      if (a && a.id !== 'add-app') {
         a.remove();
         if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
         if (selectedIndex < 0) selectedIndex = 0;
@@ -231,11 +220,10 @@
           item.className = 'app';
           item.dataset.url = url;
           item.innerHTML = `
-            <div class="app-name"></div>
+            <div class="app-name">${name}</div>
             <div class="icon"><img src="${new URL(url).origin + '/favicon.ico'}" alt="${name}"></div>
             <button class="delete-btn" title="削除">×</button>
           `;
-          item.querySelector('.app-name').textContent = name;
           item.querySelector('.delete-btn').addEventListener('click', (e)=>{
             e.stopPropagation();
             item.remove();
@@ -252,96 +240,72 @@
       }
     }
 
-    // キーボード
+    // keyboard
     document.addEventListener('keydown', (e)=>{
-      if (e.key === 'ArrowRight'){ selectedIndex = (selectedIndex + 1) % apps().length; updateSelection(); }
-      else if (e.key === 'ArrowLeft'){ selectedIndex = (selectedIndex - 1 + apps().length) % apps().length; updateSelection(); }
-      else if (e.key === 'Enter') openSelectedApp();
-      else if (e.key.toLowerCase() === 'x') deleteSelectedApp();
+      if(e.key==='ArrowRight'){ selectedIndex=(selectedIndex+1)%apps().length; updateSelection(); }
+      else if(e.key==='ArrowLeft'){ selectedIndex=(selectedIndex-1+apps().length)%apps().length; updateSelection(); }
+      else if(e.key==='Enter') openSelectedApp();
+      else if(e.key.toLowerCase()==='x') deleteSelectedApp();
     });
 
-    // クリック / ダブルクリック / 削除ボタン
+    // click/dblclick
     launcher.addEventListener('click', (e)=>{
       const app = e.target.closest('.app');
       if (!app) return;
       const idx = apps().indexOf(app);
-      if (idx >= 0){
-        selectedIndex = idx;
-        updateSelection();
-      }
+      if (idx >= 0){ selectedIndex=idx; updateSelection(); }
       if (e.target.classList.contains('delete-btn')){
         e.stopPropagation();
-        const appToDel = e.target.closest('.app');
-        const idx2 = apps().indexOf(appToDel);
-        if (idx2 >= 0){
-          appToDel.remove();
-          if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
-          updateSelection();
-        }
+        app.remove();
+        if(selectedIndex>=apps().length) selectedIndex=apps().length-1;
+        updateSelection();
       }
     });
-
-    launcher.addEventListener('dblclick', (e)=>{
-      const app = e.target.closest('.app');
-      if (!app) return;
-      const idx = apps().indexOf(app);
-      if (idx >= 0){ selectedIndex = idx; openSelectedApp(); }
+    launcher.addEventListener('dblclick',(e)=>{
+      const app=e.target.closest('.app'); if(!app) return;
+      const idx=apps().indexOf(app); if(idx>=0){ selectedIndex=idx; openSelectedApp(); }
     });
 
-    // ゲームパッド（左右スティック + 十字キー + A/X）
-    let gpState = { axisLeft:false, axisRight:false, buttons:[] };
-    const axisThreshold = 0.5;
+    // gamepad support
+    let gpState={axisLeft:false,axisRight:false,buttons:[]};
+    const axisThreshold=0.5;
     function pollGamepad(){
-      const gp = navigator.getGamepads && navigator.getGamepads()[0];
-      if (gp){
-        const buttons = gp.buttons.map(b=>b.pressed);
-        const axes = gp.axes;
+      const gp=navigator.getGamepads && navigator.getGamepads()[0];
+      if(gp){
+        const buttons=gp.buttons.map(b=>b.pressed);
+        const axes=gp.axes;
 
-        if (buttons[15] && !gpState.buttons[15]){ selectedIndex = (selectedIndex + 1) % apps().length; updateSelection(); }
-        if (buttons[14] && !gpState.buttons[14]){ selectedIndex = (selectedIndex - 1 + apps().length) % apps().length; updateSelection(); }
+        if(buttons[15]&&!gpState.buttons[15]){ selectedIndex=(selectedIndex+1)%apps().length; updateSelection(); }
+        if(buttons[14]&&!gpState.buttons[14]){ selectedIndex=(selectedIndex-1+apps().length)%apps().length; updateSelection(); }
 
-        if (axes[0] > axisThreshold && !gpState.axisRight){ selectedIndex = (selectedIndex + 1) % apps().length; gpState.axisRight = true; updateSelection(); }
-        else if (axes[0] < -axisThreshold && !gpState.axisLeft){ selectedIndex = (selectedIndex - 1 + apps().length) % apps().length; gpState.axisLeft = true; updateSelection(); }
-        else if (Math.abs(axes[0]) < axisThreshold){ gpState.axisRight = gpState.axisLeft = false; }
+        if(axes[0]>axisThreshold&&!gpState.axisRight){ selectedIndex=(selectedIndex+1)%apps().length; gpState.axisRight=true; updateSelection(); }
+        else if(axes[0]<-axisThreshold&&!gpState.axisLeft){ selectedIndex=(selectedIndex-1+apps().length)%apps().length; gpState.axisLeft=true; updateSelection(); }
+        else if(Math.abs(axes[0])<axisThreshold){ gpState.axisRight=gpState.axisLeft=false; }
 
-        if (buttons[0] && !gpState.buttons[0]) openSelectedApp();
-        if (buttons[2] && !gpState.buttons[2]) deleteSelectedApp();
+        if(buttons[0]&&!gpState.buttons[0]) openSelectedApp();
+        if(buttons[2]&&!gpState.buttons[2]) deleteSelectedApp();
 
-        gpState.buttons = buttons;
+        gpState.buttons=buttons;
       }
       requestAnimationFrame(pollGamepad);
     }
     pollGamepad();
 
     // time & battery
-    function updateTime(){ document.getElementById('time').textContent = new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}); }
+    function updateTime(){ document.getElementById('time').textContent=new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});}
     setInterval(updateTime,1000); updateTime();
 
-    if (navigator.getBattery){
+    if(navigator.getBattery){
       navigator.getBattery().then(b=>{
-        function upd(){ document.getElementById('battery').textContent = '🔋 ' + Math.round(b.level*100) + '%'; }
-        upd(); b.addEventListener('levelchange', upd);
+        function upd(){ document.getElementById('battery').textContent='🔋 '+Math.round(b.level*100)+'%'; }
+        upd(); b.addEventListener('levelchange',upd);
       });
     }
 
-    // 初回描画で確実に表示状態を整える
+    // init
     updateSelection();
 
-    // リサイズ時に中央表示
-    let resizeTimer;
-    window.addEventListener('resize', ()=>{
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(()=>{ scrollSelectedIntoView(); }, 120);
-    });
-
-    function scrollSelectedIntoView(){
-      const sel = apps()[selectedIndex];
-      if (!sel) return;
-      const launcherRect = launcher.getBoundingClientRect();
-      const selRect = sel.getBoundingClientRect();
-      const offset = (selRect.left + selRect.right)/2 - (launcherRect.left + launcherRect.right)/2;
-      launcher.scrollBy({ left: offset, behavior: 'smooth' });
-    }
+    window.addEventListener('resize',()=>{ scrollSelectedIntoView(); });
   </script>
 </body>
 </html>
