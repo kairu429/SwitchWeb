@@ -7,7 +7,7 @@
     body {
       margin: 0;
       height: 100vh;
-      background: linear-gradient(180deg, #1a1a1a, #333333); /* 背景を少し灰色寄り */
+      background: linear-gradient(180deg, #0d0d0d, #1a1a1a);
       color: white;
       font-family: "Segoe UI", sans-serif;
       display: flex;
@@ -27,7 +27,7 @@
 
     .launcher {
       display: flex;
-      align-items: flex-end; /* 名前が上にくるように */
+      align-items: flex-end;
       overflow-x: auto;
       padding: 15px 60px 15px 30px; 
       gap: 50px; 
@@ -35,12 +35,9 @@
     }
 
     .app {
-      position: relative;
+      text-align: center;
       flex-shrink: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-end; /* 名前を上に寄せる */
+      position: relative;
     }
 
     .icon {
@@ -65,9 +62,12 @@
       border-radius: 18px;
     }
 
+    /* 名前をアイコンの少し上に固定 */
     .app-name {
-      position: absolute; /* アイコンの上に固定 */
-      top: -28px; /* アイコンの上に配置 */
+      position: absolute;
+      top: -26px; /* アイコンの上に配置 */
+      width: 100%;
+      text-align: center;
       font-size: 17px;
       color: #00bfff; /* 水色 */
       font-weight: bold;
@@ -225,16 +225,13 @@
         const buttons = gp.buttons.map(b => b.pressed);
         const axes = gp.axes;
 
-        // 十字キー
         if (buttons[15] && !lastState[15]) selectedIndex = (selectedIndex + 1) % apps.length;
         if (buttons[14] && !lastState[14]) selectedIndex = (selectedIndex - 1 + apps.length) % apps.length;
 
-        // 左スティック横
         if (axes[0] > threshold && !lastState.axisRight) { selectedIndex = (selectedIndex + 1) % apps.length; lastState.axisRight = true; }
         else if (axes[0] < -threshold && !lastState.axisLeft) { selectedIndex = (selectedIndex - 1 + apps.length) % apps.length; lastState.axisLeft = true; }
         else if (Math.abs(axes[0]) < threshold) { lastState.axisRight = false; lastState.axisLeft = false; }
 
-        // Aボタンで開く、Xボタンで削除
         if (buttons[0] && !lastState[0]) openSelectedApp();
         if (buttons[2] && !lastState[2]) deleteSelectedApp();
 
