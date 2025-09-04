@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>Switch風 Webランチャー</title>
+  <title>Switch風 Webランチャー — 青文字表示修正版</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root{
@@ -12,7 +12,6 @@
       --icon-size:140px;
       --gap:50px;
     }
-
     html,body{height:100%;margin:0;}
     body{
       background: linear-gradient(180deg,var(--bg1),var(--bg2));
@@ -21,16 +20,18 @@
       display:flex;
       flex-direction:column;
       overflow:hidden;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
     }
 
     .topbar{
       display:flex;
+      align-items:center;
       justify-content:flex-end;
       padding:10px 24px;
       color:#cfcfcf;
       gap:12px;
     }
-
     .status-right{display:flex; gap:14px; align-items:center; color:#bfbfbf;}
 
     .launcher-wrap{position:relative; flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden;}
@@ -44,15 +45,34 @@
     }
     .launcher::-webkit-scrollbar{display:none;}
 
+    /* 各アプリは縦方向のフローで、名前がアイコンの上に来るようにする */
     .app{
       position:relative;
       width:var(--icon-size);
       display:flex;
-      flex-direction:column;
+      flex-direction:column; /* 名前(上) → アイコン(下) の自然なフロー */
       align-items:center;
-      justify-content:center;
+      justify-content:flex-start;
       flex-shrink:0;
+      gap:8px;
       transition:transform .18s ease;
+    }
+
+    .app-name{
+      /* フロー内にあるので見切れにくい */
+      margin:0;
+      padding:0 6px;
+      font-size:14.5px;
+      font-weight:700;
+      color:var(--accent);
+      white-space:nowrap;
+      text-overflow:ellipsis;
+      overflow:hidden;
+      max-width:calc(var(--icon-size) + 20px); /* アイコン幅に合わせて最大幅 */
+      opacity:0; /* 非表示がデフォルト */
+      transform:translateY(-4px);
+      transition:opacity .12s ease, transform .12s ease;
+      pointer-events:none;
     }
 
     .icon{
@@ -71,34 +91,19 @@
     }
     .icon img{width:100%;height:100%;object-fit:cover;display:block;border-radius:18px;}
 
-    /* 選択中のみ青文字 */
-    .app-name{
-      position:absolute;
-      top:calc(-1.2 * var(--icon-size));
-      left:50%;
-      transform:translateX(-50%) translateY(-2px);
-      width:max-content;
-      max-width:200px;
-      text-align:center;
-      font-size:14.5px;
-      font-weight:700;
-      color:var(--accent);
-      pointer-events:none;
-      white-space:nowrap;
-      opacity:0;
-      transition:opacity .12s ease, transform .12s ease;
-    }
+    /* 選択時だけ名前を出す（opacity 切替） */
     .app.selected .app-name{
       opacity:1;
-      transform:translateX(-50%) translateY(0);
+      transform:translateY(0);
     }
 
-    /* 選択時の枠 */
+    /* 選択時の枠（拡大しない） */
     .app.selected .icon{
       border:3px solid rgba(0,191,255,0.95);
       box-shadow:0 8px 30px rgba(0,191,255,0.18), 0 4px 10px rgba(0,0,0,0.35);
     }
 
+    /* 非選択アイコンを少し左詰め（compact クラス付与時） */
     .launcher.compact .app:not(.selected){
       transform: translateX(-8px);
     }
@@ -137,6 +142,7 @@
 
   <div class="launcher-wrap">
     <div class="launcher" id="launcher" role="listbox" aria-label="アプリランチャー">
+      <!-- 注意: app-name を DOM の先頭に置く（アイコンの上に来る） -->
       <div class="app selected" data-url="https://www.google.com" role="option" aria-selected="true">
         <div class="app-name">Google</div>
         <div class="icon"><img src="https://www.google.com/favicon.ico" alt="Google"></div>
@@ -177,7 +183,6 @@
   <script>
     const launcher = document.getElementById('launcher');
     let selectedIndex = 0;
-
     const apps = () => Array.from(launcher.querySelectorAll('.app'));
 
     function updateSelection(){
@@ -185,8 +190,16 @@
         const is = i === selectedIndex;
         app.classList.toggle('selected', is);
         app.setAttribute('aria-selected', is ? 'true' : 'false');
+
+        // JSでも確実に opacity を設定（CSSトランジションは残す）
+        const nameEl = app.querySelector('.app-name');
+        if (nameEl) {
+          nameEl.style.opacity = is ? '1' : '0';
+          nameEl.style.transform = is ? 'translateY(0)' : 'translateY(-4px)';
+        }
       });
-      launcher.classList.toggle('compact', true);
+      // compact 効果（非選択を少し左へ詰める）
+      launcher.classList.add('compact');
       scrollSelectedIntoView();
     }
 
@@ -201,7 +214,7 @@
 
     function deleteSelectedApp(){
       const a = apps()[selectedIndex];
-      if (a && a.id !== 'add-app') {
+      if (a && a.id !== 'add-app'){
         a.remove();
         if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
         if (selectedIndex < 0) selectedIndex = 0;
@@ -220,8 +233,8 @@
           item.className = 'app';
           item.dataset.url = url;
           item.innerHTML = `
-            <div class="app-name">${name}</div>
-            <div class="icon"><img src="${new URL(url).origin + '/favicon.ico'}" alt="${name}"></div>
+            <div class="app-name">${escapeHtml(name)}</div>
+            <div class="icon"><img src="${new URL(url).origin + '/favicon.ico'}" alt="${escapeHtml(name)}"></div>
             <button class="delete-btn" title="削除">×</button>
           `;
           item.querySelector('.delete-btn').addEventListener('click', (e)=>{
@@ -240,72 +253,88 @@
       }
     }
 
+    // simple HTML escape for inserted names
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
     // keyboard
     document.addEventListener('keydown', (e)=>{
-      if(e.key==='ArrowRight'){ selectedIndex=(selectedIndex+1)%apps().length; updateSelection(); }
-      else if(e.key==='ArrowLeft'){ selectedIndex=(selectedIndex-1+apps().length)%apps().length; updateSelection(); }
-      else if(e.key==='Enter') openSelectedApp();
-      else if(e.key.toLowerCase()==='x') deleteSelectedApp();
+      if (e.key === 'ArrowRight'){ selectedIndex = (selectedIndex + 1) % apps().length; updateSelection(); }
+      else if (e.key === 'ArrowLeft'){ selectedIndex = (selectedIndex - 1 + apps().length) % apps().length; updateSelection(); }
+      else if (e.key === 'Enter') openSelectedApp();
+      else if (e.key.toLowerCase() === 'x') deleteSelectedApp();
     });
 
-    // click/dblclick
+    // mouse interactions
     launcher.addEventListener('click', (e)=>{
       const app = e.target.closest('.app');
       if (!app) return;
       const idx = apps().indexOf(app);
-      if (idx >= 0){ selectedIndex=idx; updateSelection(); }
+      if (idx >= 0){ selectedIndex = idx; updateSelection(); }
       if (e.target.classList.contains('delete-btn')){
         e.stopPropagation();
-        app.remove();
-        if(selectedIndex>=apps().length) selectedIndex=apps().length-1;
+        const appToDel = e.target.closest('.app');
+        appToDel.remove();
+        if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
         updateSelection();
       }
     });
-    launcher.addEventListener('dblclick',(e)=>{
-      const app=e.target.closest('.app'); if(!app) return;
-      const idx=apps().indexOf(app); if(idx>=0){ selectedIndex=idx; openSelectedApp(); }
+
+    launcher.addEventListener('dblclick', (e)=>{
+      const app = e.target.closest('.app');
+      if (!app) return;
+      const idx = apps().indexOf(app);
+      if (idx >= 0){ selectedIndex = idx; openSelectedApp(); }
     });
 
-    // gamepad support
-    let gpState={axisLeft:false,axisRight:false,buttons:[]};
-    const axisThreshold=0.5;
+    // gamepad
+    let gpState = { axisLeft:false, axisRight:false, buttons:[] };
+    const axisThreshold = 0.5;
     function pollGamepad(){
-      const gp=navigator.getGamepads && navigator.getGamepads()[0];
-      if(gp){
-        const buttons=gp.buttons.map(b=>b.pressed);
-        const axes=gp.axes;
+      const gp = navigator.getGamepads && navigator.getGamepads()[0];
+      if (gp){
+        const buttons = gp.buttons.map(b=>b.pressed);
+        const axes = gp.axes;
 
-        if(buttons[15]&&!gpState.buttons[15]){ selectedIndex=(selectedIndex+1)%apps().length; updateSelection(); }
-        if(buttons[14]&&!gpState.buttons[14]){ selectedIndex=(selectedIndex-1+apps().length)%apps().length; updateSelection(); }
+        if (buttons[15] && !gpState.buttons[15]){ selectedIndex=(selectedIndex+1)%apps().length; updateSelection(); }
+        if (buttons[14] && !gpState.buttons[14]){ selectedIndex=(selectedIndex-1+apps().length)%apps().length; updateSelection(); }
 
-        if(axes[0]>axisThreshold&&!gpState.axisRight){ selectedIndex=(selectedIndex+1)%apps().length; gpState.axisRight=true; updateSelection(); }
-        else if(axes[0]<-axisThreshold&&!gpState.axisLeft){ selectedIndex=(selectedIndex-1+apps().length)%apps().length; gpState.axisLeft=true; updateSelection(); }
-        else if(Math.abs(axes[0])<axisThreshold){ gpState.axisRight=gpState.axisLeft=false; }
+        if (axes[0] > axisThreshold && !gpState.axisRight){ selectedIndex=(selectedIndex+1)%apps().length; gpState.axisRight=true; updateSelection(); }
+        else if (axes[0] < -axisThreshold && !gpState.axisLeft){ selectedIndex=(selectedIndex-1+apps().length)%apps().length; gpState.axisLeft=true; updateSelection(); }
+        else if (Math.abs(axes[0]) < axisThreshold){ gpState.axisRight = gpState.axisLeft = false; }
 
-        if(buttons[0]&&!gpState.buttons[0]) openSelectedApp();
-        if(buttons[2]&&!gpState.buttons[2]) deleteSelectedApp();
+        if (buttons[0] && !gpState.buttons[0]) openSelectedApp();
+        if (buttons[2] && !gpState.buttons[2]) deleteSelectedApp();
 
-        gpState.buttons=buttons;
+        gpState.buttons = buttons;
       }
       requestAnimationFrame(pollGamepad);
     }
     pollGamepad();
 
     // time & battery
-    function updateTime(){ document.getElementById('time').textContent=new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});}
+    function updateTime(){ document.getElementById('time').textContent=new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}); }
     setInterval(updateTime,1000); updateTime();
-
-    if(navigator.getBattery){
+    if (navigator.getBattery){
       navigator.getBattery().then(b=>{
         function upd(){ document.getElementById('battery').textContent='🔋 '+Math.round(b.level*100)+'%'; }
-        upd(); b.addEventListener('levelchange',upd);
+        upd(); b.addEventListener('levelchange', upd);
       });
     }
 
     // init
     updateSelection();
+    // center on resize
+    let resizeTimer;
+    window.addEventListener('resize', ()=>{ clearTimeout(resizeTimer); resizeTimer = setTimeout(()=>{ scrollSelectedIntoView(); }, 120); });
 
-    window.addEventListener('resize',()=>{ scrollSelectedIntoView(); });
+    function scrollSelectedIntoView(){
+      const sel = apps()[selectedIndex];
+      if (!sel) return;
+      const launcherRect = launcher.getBoundingClientRect();
+      const selRect = sel.getBoundingClientRect();
+      const offset = (selRect.left + selRect.right)/2 - (launcherRect.left + launcherRect.right)/2;
+      launcher.scrollBy({ left: offset, behavior: 'smooth' });
+    }
   </script>
 </body>
 </html>
