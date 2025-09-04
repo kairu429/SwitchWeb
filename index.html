@@ -52,6 +52,14 @@
       font-size: 24px;
       transition: transform 0.3s, box-shadow 0.3s;
       cursor: pointer;
+      overflow: hidden;
+    }
+
+    .icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 20px;
     }
 
     .app-name {
@@ -95,20 +103,25 @@
   <!-- アイコン -->
   <div class="launcher" id="launcher">
     <div class="app selected" data-url="https://www.google.com">
-      <div class="icon">🌐</div>
+      <div class="icon"><img src="https://www.google.com/favicon.ico"></div>
       <div class="app-name">Google</div>
     </div>
     <div class="app" data-url="https://www.youtube.com">
-      <div class="icon">▶️</div>
+      <div class="icon"><img src="https://www.youtube.com/s/desktop/8e5d97e3/img/favicon_144.png"></div>
       <div class="app-name">YouTube</div>
     </div>
     <div class="app" data-url="https://discord.com">
-      <div class="icon">💬</div>
+      <div class="icon"><img src="https://discord.com/assets/07dca80a102d4149e9736d4b162cff6f.ico"></div>
       <div class="app-name">Discord</div>
     </div>
     <div class="app" data-url="https://github.com">
-      <div class="icon">🐙</div>
+      <div class="icon"><img src="https://github.githubassets.com/favicons/favicon.png"></div>
       <div class="app-name">GitHub</div>
+    </div>
+    <!-- URL追加ボタン -->
+    <div class="app" id="add-app">
+      <div class="icon">＋</div>
+      <div class="app-name">追加</div>
     </div>
   </div>
 
@@ -120,7 +133,8 @@
   </div>
 
   <script>
-    const apps = document.querySelectorAll(".app");
+    const launcher = document.getElementById("launcher");
+    let apps = Array.from(document.querySelectorAll(".app"));
     let selectedIndex = 0;
 
     function updateSelection() {
@@ -130,8 +144,27 @@
     }
 
     function openSelectedApp() {
-      const url = apps[selectedIndex].dataset.url;
-      if (url) window.open(url, "_blank");
+      const selected = apps[selectedIndex];
+      if (selected.id === "add-app") {
+        const name = prompt("アプリ名を入力してください:");
+        const url = prompt("URLを入力してください:");
+        const iconUrl = prompt("アイコン画像のURLを入力してください:");
+        if (name && url && iconUrl) {
+          const app = document.createElement("div");
+          app.className = "app";
+          app.dataset.url = url;
+          app.innerHTML = `
+            <div class="icon"><img src="${iconUrl}" alt="${name}"></div>
+            <div class="app-name">${name}</div>
+          `;
+          launcher.insertBefore(app, document.getElementById("add-app"));
+          apps = Array.from(document.querySelectorAll(".app"));
+          updateSelection();
+        }
+      } else {
+        const url = selected.dataset.url;
+        if (url) window.open(url, "_blank");
+      }
     }
 
     // キーボード操作
