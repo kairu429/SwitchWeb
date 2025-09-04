@@ -1,262 +1,420 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<title>Switch風 Webランチャー — 矢印キー対応</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-:root{
-  --bg1:#0d0d0d;
-  --bg2:#1a1a1a;
-  --accent:#00bfff;
-  --icon-size:140px;
-  --gap:50px;
-  --circle-size:64px;
-}
-html,body{height:100%;margin:0;}
-body{
-  background:linear-gradient(180deg,var(--bg1),var(--bg2));
-  color:#fff;
-  font-family:"Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial;
-  display:flex;
-  flex-direction:column;
-  overflow:hidden;
-}
-.topbar{
-  display:flex;
-  align-items:center;
-  justify-content:flex-end;
-  padding:10px 24px;
-  color:#cfcfcf;
-  gap:12px;
-}
-.status-right{display:flex; gap:14px; align-items:center; color:#bfbfbf;}
+  <meta charset="utf-8" />
+  <title>Switch風 Webランチャー — 矢印 & スティック対応 完全版</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --bg1:#0d0d0d;
+      --bg2:#1a1a1a;
+      --accent:#00bfff;
+      --icon-size:140px;
+      --gap:50px;
+      --circle-size:64px;
+    }
+    html,body{height:100%;margin:0;}
+    body{
+      background: linear-gradient(180deg,var(--bg1),var(--bg2));
+      color:#fff;
+      font-family:"Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial;
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+    }
 
-.launcher-wrap{position:relative; flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden;}
-.launcher{
-  display:flex;
-  align-items:center;
-  overflow-x:auto;
-  gap:var(--gap);
-  padding:20px 80px;
-  scrollbar-width:none; -ms-overflow-style:none;
-}
-.launcher::-webkit-scrollbar{display:none;}
+    .topbar{display:flex;align-items:center;justify-content:flex-end;padding:10px 24px;color:#cfcfcf;gap:12px;}
+    .status-right{display:flex; gap:14px; align-items:center; color:#bfbfbf;}
 
-.app{
-  position:relative;
-  width:var(--icon-size);
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:flex-start;
-  flex-shrink:0;
-  gap:8px;
-  transition:transform .18s ease;
-}
-.app-name{
-  margin:0;
-  padding:0 6px;
-  font-size:14.5px;
-  font-weight:700;
-  color:var(--accent);
-  white-space:nowrap;
-  text-overflow:ellipsis;
-  overflow:hidden;
-  max-width:calc(var(--icon-size)+20px);
-  opacity:0;
-  transform:translateY(-4px);
-  transition:opacity .12s ease, transform .12s ease;
-  pointer-events:none;
-}
-.icon{
-  width:var(--icon-size);
-  height:var(--icon-size);
-  border-radius:18px;
-  background:#222;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  overflow:hidden;
-  box-shadow:0 6px 18px rgba(0,0,0,0.45);
-  transition:box-shadow .18s ease, border .12s ease;
-  position:relative;
-  z-index:1;
-}
-.icon img{width:100%;height:100%;object-fit:cover;display:block;border-radius:18px;}
-.app.selected .app-name{opacity:1; transform:translateY(0);}
-.app.selected .icon{
-  border:3px solid rgba(0,191,255,0.95);
-  box-shadow:0 8px 30px rgba(0,191,255,0.18),0 4px 10px rgba(0,0,0,0.35);
-}
-.launcher.compact .app:not(.selected){transform: translateX(-8px);}
-.delete-btn{
-  position:absolute;
-  top:-10px;
-  right:-10px;
-  width:26px;height:26px;border-radius:50%;
-  border:none;background:#ff5c5c;color:#fff;cursor:pointer;
-  display:none;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,0.4);
-  z-index:2;
-}
-.app:hover .delete-btn{display:block;}
+    .launcher-wrap{position:relative; flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden;}
+    .launcher{
+      display:flex; align-items:center; overflow-x:auto; gap:var(--gap); padding:20px 80px;
+      scrollbar-width:none; -ms-overflow-style:none;
+    }
+    .launcher::-webkit-scrollbar{display:none;}
 
-/* 丸アイコンメニュー */
-.menu{display:flex;justify-content:center;align-items:center;gap:40px;padding:18px 12px;border-top:1px solid rgba(255,255,255,0.04);background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));}
-.circle-item{display:flex;flex-direction:column;align-items:center;gap:8px;}
-.circle-btn{
-  width:var(--circle-size);height:var(--circle-size);
-  border-radius:50%;
-  background:rgba(255,255,255,0.04);
-  display:flex;align-items:center;justify-content:center;
-  border:2px solid rgba(255,255,255,0.06);
-  cursor:pointer;transition:background .12s ease, transform .12s ease, box-shadow .12s ease;
-  color:#fff;font-weight:700;outline:none;
-}
-.circle-btn.selected{border-color:var(--accent); box-shadow:0 0 0 6px rgba(0,191,255,0.18);}
-.circle-btn:hover{transform:translateY(-3px); background:rgba(255,255,255,0.06);}
-.circle-label{font-size:13px;color:#ddd;text-align:center;user-select:none;}
+    .app{
+      position:relative; width:var(--icon-size); display:flex; flex-direction:column; align-items:center;
+      justify-content:flex-start; flex-shrink:0; gap:8px; transition:transform .18s ease;
+    }
+    .app-name{
+      margin:0; padding:0 6px; font-size:14.5px; font-weight:700; color:var(--accent);
+      white-space:nowrap; text-overflow:ellipsis; overflow:hidden; max-width:calc(var(--icon-size)+20px);
+      opacity:0; transform:translateY(-4px); transition:opacity .12s ease, transform .12s ease; pointer-events:none;
+    }
 
-@media(max-width:900px){:root{--icon-size:120px;--gap:34px;--circle-size:54px;}}
-</style>
+    .icon{
+      width:var(--icon-size); height:var(--icon-size); border-radius:18px; background:#222;
+      display:flex; align-items:center; justify-content:center; overflow:hidden;
+      box-shadow:0 6px 18px rgba(0,0,0,0.45); transition:box-shadow .18s ease, border .12s ease; position:relative; z-index:1;
+    }
+    .icon img{width:100%;height:100%;object-fit:cover;display:block;border-radius:18px;}
+
+    .app.selected .app-name{opacity:1; transform:translateY(0);}
+    .app.selected .icon{
+      border:3px solid rgba(0,191,255,0.95);
+      box-shadow:0 8px 30px rgba(0,191,255,0.18), 0 4px 10px rgba(0,0,0,0.35);
+    }
+
+    .launcher.compact .app:not(.selected){ transform: translateX(-8px); }
+
+    .delete-btn{
+      position:absolute; top:-10px; right:-10px; width:26px; height:26px; border-radius:50%;
+      border:none; background:#ff5c5c; color:#fff; cursor:pointer; display:none; font-weight:700;
+      box-shadow:0 2px 6px rgba(0,0,0,0.4); z-index:2;
+    }
+    .app:hover .delete-btn{ display:block; }
+
+    /* 丸アイコンメニュー */
+    .menu{ display:flex; justify-content:center; align-items:center; gap:40px; padding:18px 12px;
+      border-top:1px solid rgba(255,255,255,0.04);
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); }
+    .circle-item{ display:flex; flex-direction:column; align-items:center; gap:8px; }
+    .circle-btn{
+      width:var(--circle-size); height:var(--circle-size); border-radius:50%;
+      background:rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:center;
+      border:2px solid rgba(255,255,255,0.06); cursor:pointer; transition:background .12s ease, transform .12s ease, box-shadow .12s ease;
+      color:#fff; font-weight:700; outline:none;
+    }
+    .circle-btn.selected{ border-color:var(--accent); box-shadow:0 0 0 6px rgba(0,191,255,0.18); transform:translateY(-3px); background:rgba(0,191,255,0.06); }
+    .circle-label{ font-size:13px; color:#ddd; text-align:center; user-select:none; }
+
+    @media (max-width:900px){ :root{ --icon-size:120px; --gap:34px; --circle-size:54px; } }
+  </style>
 </head>
 <body>
-<div class="topbar">
-  <div class="status-right">
-    <div id="time"></div>
-    <div id="battery">🔋 --%</div>
-  </div>
-</div>
-
-<div class="launcher-wrap">
-  <div class="launcher" id="launcher" role="listbox" aria-label="アプリランチャー">
-    <div class="app selected" data-url="https://www.google.com" role="option" aria-selected="true">
-      <div class="app-name">Google</div>
-      <div class="icon"><img src="https://www.google.com/favicon.ico" alt="Google"></div>
-      <button class="delete-btn" title="削除">×</button>
-    </div>
-    <div class="app" data-url="https://www.youtube.com" role="option" aria-selected="false">
-      <div class="app-name">YouTube</div>
-      <div class="icon"><img src="https://www.youtube.com/favicon.ico" alt="YouTube"></div>
-      <button class="delete-btn" title="削除">×</button>
-    </div>
-    <div class="app" data-url="https://discord.com" role="option" aria-selected="false">
-      <div class="app-name">Discord</div>
-      <div class="icon"><img src="https://discord.com/favicon.ico" alt="Discord"></div>
-      <button class="delete-btn" title="削除">×</button>
-    </div>
-    <div class="app" data-url="https://github.com" role="option" aria-selected="false">
-      <div class="app-name">GitHub</div>
-      <div class="icon"><img src="https://github.com/favicon.ico" alt="GitHub"></div>
-      <button class="delete-btn" title="削除">×</button>
-    </div>
-    <div class="app" id="add-app" role="option" aria-selected="false">
-      <div class="app-name">追加</div>
-      <div class="icon">＋</div>
+  <div class="topbar">
+    <div class="status-right">
+      <div id="time"></div>
+      <div id="battery">🔋 --%</div>
     </div>
   </div>
-</div>
 
-<div class="menu" role="toolbar" aria-label="ランチャーメニュー">
-  <div class="circle-item">
-    <button class="circle-btn" id="btn-settings" title="設定" aria-label="設定">⚙</button>
-    <div class="circle-label">設定</div>
+  <div class="launcher-wrap">
+    <div class="launcher" id="launcher" role="listbox" aria-label="アプリランチャー">
+      <div class="app selected" data-url="https://www.google.com" role="option" aria-selected="true">
+        <div class="app-name">Google</div>
+        <div class="icon"><img src="https://www.google.com/favicon.ico" alt="Google"></div>
+        <button class="delete-btn" title="削除">×</button>
+      </div>
+
+      <div class="app" data-url="https://www.youtube.com" role="option" aria-selected="false">
+        <div class="app-name">YouTube</div>
+        <div class="icon"><img src="https://www.youtube.com/favicon.ico" alt="YouTube"></div>
+        <button class="delete-btn" title="削除">×</button>
+      </div>
+
+      <div class="app" data-url="https://discord.com" role="option" aria-selected="false">
+        <div class="app-name">Discord</div>
+        <div class="icon"><img src="https://discord.com/favicon.ico" alt="Discord"></div>
+        <button class="delete-btn" title="削除">×</button>
+      </div>
+
+      <div class="app" data-url="https://github.com" role="option" aria-selected="false">
+        <div class="app-name">GitHub</div>
+        <div class="icon"><img src="https://github.com/favicon.ico" alt="GitHub"></div>
+        <button class="delete-btn" title="削除">×</button>
+      </div>
+
+      <div class="app" id="add-app" role="option" aria-selected="false">
+        <div class="app-name">追加</div>
+        <div class="icon">＋</div>
+      </div>
+    </div>
   </div>
-  <div class="circle-item">
-    <button class="circle-btn" id="btn-store" title="ストア" aria-label="ストア">🛒</button>
-    <div class="circle-label">ストア</div>
+
+  <div class="menu" role="toolbar" aria-label="ランチャーメニュー">
+    <div class="circle-item">
+      <button class="circle-btn" id="btn-settings" title="設定" aria-label="設定">⚙</button>
+      <div class="circle-label">設定</div>
+    </div>
+
+    <div class="circle-item">
+      <button class="circle-btn" id="btn-store" title="ストア" aria-label="ストア">🛒</button>
+      <div class="circle-label">ストア</div>
+    </div>
+
+    <div class="circle-item">
+      <button class="circle-btn" id="btn-power" title="電源" aria-label="電源">⏻</button>
+      <div class="circle-label">電源</div>
+    </div>
   </div>
-  <div class="circle-item">
-    <button class="circle-btn" id="btn-power" title="電源" aria-label="電源">⏻</button>
-    <div class="circle-label">電源</div>
-  </div>
-</div>
 
-<script>
-// 上段アプリ
-const launcher=document.getElementById('launcher');
-let selectedIndex=0;
-const apps=()=>Array.from(launcher.querySelectorAll('.app'));
+  <script>
+    // Elements & state
+    const launcher = document.getElementById('launcher');
+    const circleBtns = [...document.querySelectorAll('.circle-btn')];
 
-// 下段丸アイコン
-const circleBtns=[...document.querySelectorAll('.circle-btn')];
-let circleIndex=-1; // -1=アプリ, 0~n=丸アイコン
+    let selectedIndex = 0;   // index for apps
+    let circleIndex = -1;    // -1 = apps active, >=0 = bottom menu active
+    const apps = () => Array.from(launcher.querySelectorAll('.app'));
 
-function updateSelection(){
-  apps().forEach((app,i)=>{
-    const is=(circleIndex===-1 && i===selectedIndex);
-    app.classList.toggle('selected',is);
-    app.setAttribute('aria-selected',is?'true':'false');
-    const nameEl=app.querySelector('.app-name');
-    if(nameEl){nameEl.style.opacity=is?'1':'0'; nameEl.style.transform=is?'translateY(0)':'translateY(-4px)';}
-  });
-  launcher.classList.add('compact');
-  scrollSelectedIntoView();
-}
+    // Input debounce
+    let lastInput = 0;
+    const INPUT_COOLDOWN = 120; // ms
 
-function scrollSelectedIntoView(){
-  const sel=apps()[selectedIndex]; if(!sel)return;
-  const launcherRect=launcher.getBoundingClientRect();
-  const selRect=sel.getBoundingClientRect();
-  const offset=(selRect.left+selRect.right)/2-(launcherRect.left+launcherRect.right)/2;
-  launcher.scrollBy({left:offset,behavior:'smooth'});
-}
+    // Gamepad state to detect edges
+    let gpPrevButtons = [];
+    let gpPrevAxes = [0,0];
 
-function updateCircleSelection(){
-  circleBtns.forEach((btn,i)=>btn.classList.toggle('selected',i===circleIndex));
-}
+    const AXIS_THRESHOLD = 0.5;
 
-// 操作関数
-function openSelectedApp(){
-  if(circleIndex===-1){
-    const a=apps()[selectedIndex]; if(!a)return;
-    if(a.id==='add-app'){
-      const name=prompt('アプリ名を入力'); const url=prompt('URLを入力');
-      if(name&&url){
-        const item=document.createElement('div'); item.className='app'; item.dataset.url=url;
-        item.innerHTML=`<div class="app-name">${escapeHtml(name)}</div><div class="icon"><img src="${new URL(url).origin+'/favicon.ico'}" alt="${escapeHtml(name)}"></div><button class="delete-btn" title="削除">×</button>`;
-        item.querySelector('.delete-btn').addEventListener('click',e=>{e.stopPropagation(); item.remove(); if(selectedIndex>=apps().length) selectedIndex=apps().length-1; updateSelection();});
-        launcher.insertBefore(item,document.getElementById('add-app'));
-        selectedIndex=apps().indexOf(item); updateSelection();
+    // Helpers
+    function now() { return performance.now(); }
+    function canInput() {
+      const t = now();
+      if (t - lastInput < INPUT_COOLDOWN) return false;
+      lastInput = t;
+      return true;
+    }
+
+    function updateSelectionUI(){
+      // apps selection only active when circleIndex === -1
+      apps().forEach((app, i) => {
+        const isSelected = (circleIndex === -1 && i === selectedIndex);
+        app.classList.toggle('selected', isSelected);
+        app.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+        const nameEl = app.querySelector('.app-name');
+        if (nameEl) {
+          nameEl.style.opacity = isSelected ? '1' : '0';
+          nameEl.style.transform = isSelected ? 'translateY(0)' : 'translateY(-4px)';
+        }
+      });
+      // bottom selection
+      circleBtns.forEach((btn, i) => {
+        btn.classList.toggle('selected', i === circleIndex);
+      });
+      // visual compact effect
+      launcher.classList.toggle('compact', true);
+      // ensure selected app visible when apps active
+      if (circleIndex === -1) scrollSelectedIntoView();
+    }
+
+    function scrollSelectedIntoView() {
+      const sel = apps()[selectedIndex];
+      if (!sel) return;
+      const lr = launcher.getBoundingClientRect();
+      const sr = sel.getBoundingClientRect();
+      const offset = (sr.left + sr.right) / 2 - (lr.left + lr.right) / 2;
+      launcher.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+
+    // Navigation
+    function moveApp(delta){
+      if (!canInput()) return;
+      const len = apps().length;
+      if (len === 0) return;
+      selectedIndex = (selectedIndex + delta + len) % len;
+      // if add-app is selected and it's last, it's OK
+      updateSelectionUI();
+    }
+
+    function moveCircle(delta){
+      if (!canInput()) return;
+      const len = circleBtns.length;
+      circleIndex = (circleIndex + delta + len) % len;
+      updateSelectionUI();
+    }
+
+    function switchToCircle(index = 0){
+      if (!canInput()) return;
+      circleIndex = Math.max(0, Math.min(index, circleBtns.length - 1));
+      updateSelectionUI();
+    }
+
+    function switchToApps(){
+      if (!canInput()) return;
+      circleIndex = -1;
+      updateSelectionUI();
+    }
+
+    function deleteSelectedApp(){
+      if (circleIndex !== -1) return; // only when apps active
+      const a = apps()[selectedIndex];
+      if (a && a.id !== 'add-app') {
+        a.remove();
+        if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
+        if (selectedIndex < 0) selectedIndex = 0;
+        updateSelectionUI();
       }
-    }else{window.open(apps()[selectedIndex].dataset.url,'_blank');}
-  }else{circleBtns[circleIndex].click();}
-}
+    }
 
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+    function openSelected(){
+      if (circleIndex === -1){
+        const a = apps()[selectedIndex];
+        if (!a) return;
+        if (a.id === 'add-app'){
+          const name = prompt('アプリ名を入力してください:');
+          const url = prompt('URLを入力してください:');
+          if (name && url){
+            const item = document.createElement('div');
+            item.className = 'app';
+            item.dataset.url = url;
+            item.innerHTML = `
+              <div class="app-name">${escapeHtml(name)}</div>
+              <div class="icon"><img src="${new URL(url).origin + '/favicon.ico'}" alt="${escapeHtml(name)}"></div>
+              <button class="delete-btn" title="削除">×</button>
+            `;
+            item.querySelector('.delete-btn').addEventListener('click', (e) => {
+              e.stopPropagation();
+              item.remove();
+              if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
+              updateSelectionUI();
+            });
+            launcher.insertBefore(item, document.getElementById('add-app'));
+            selectedIndex = apps().indexOf(item);
+            updateSelectionUI();
+          }
+        } else {
+          const url = a.dataset.url;
+          if (url) window.open(url, '_blank');
+        }
+      } else {
+        // activate selected circle button
+        if (circleIndex >= 0 && circleIndex < circleBtns.length) {
+          circleBtns[circleIndex].click();
+        }
+      }
+    }
 
-// キーボード
-document.addEventListener('keydown',e=>{
-  if(circleIndex===-1){ // アプリ選択中
-    if(e.key==='ArrowRight'){selectedIndex=(selectedIndex+1)%apps().length; updateSelection();}
-    else if(e.key==='ArrowLeft'){selectedIndex=(selectedIndex-1+apps().length)%apps().length; updateSelection();}
-    else if(e.key==='ArrowDown'){circleIndex=0; updateCircleSelection(); updateSelection();}
-    else if(e.key==='Enter') openSelectedApp();
-    else if(e.key.toLowerCase()==='x') deleteSelectedApp();
-  }else{ // 下段丸アイコン
-    if(e.key==='ArrowRight'){circleIndex=(circleIndex+1)%circleBtns.length; updateCircleSelection();}
-    else if(e.key==='ArrowLeft'){circleIndex=(circleIndex-1+circleBtns.length)%circleBtns.length; updateCircleSelection();}
-    else if(e.key==='ArrowUp'){circleIndex=-1; updateCircleSelection(); updateSelection();}
-    else if(e.key==='Enter') openSelectedApp();
-  }
-});
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-// 削除
-function deleteSelectedApp(){const a=apps()[selectedIndex]; if(a&&a.id!=='add-app'){a.remove(); if(selectedIndex>=apps().length)selectedIndex=apps().length-1; updateSelection();}}
+    // keyboard handlers (with same debouncing)
+    document.addEventListener('keydown', (e) => {
+      // prevent input spam via canInput
+      if (e.repeat) {
+        // still allow movement but controlled by canInput
+      }
+      if (circleIndex === -1) {
+        // apps focused
+        if (e.key === 'ArrowRight') { moveApp(1); e.preventDefault(); }
+        else if (e.key === 'ArrowLeft') { moveApp(-1); e.preventDefault(); }
+        else if (e.key === 'ArrowDown') { switchToCircle(0); e.preventDefault(); }
+        else if (e.key === 'Enter') { openSelected(); e.preventDefault(); }
+        else if (e.key.toLowerCase() === 'x') { deleteSelectedApp(); e.preventDefault(); }
+      } else {
+        // circle focused
+        if (e.key === 'ArrowRight') { moveCircle(1); e.preventDefault(); }
+        else if (e.key === 'ArrowLeft') { moveCircle(-1); e.preventDefault(); }
+        else if (e.key === 'ArrowUp') { switchToApps(); e.preventDefault(); }
+        else if (e.key === 'Enter') { openSelected(); e.preventDefault(); }
+      }
+    });
 
-// 丸アイコン動作
-document.getElementById('btn-settings').addEventListener('click',()=>{try{window.open('chrome://settings/','_blank');}catch(e){alert('このブラウザでは開けません。');}});
-document.getElementById('btn-store').addEventListener('click',()=>{window.open('https://www.amazon.co.jp/','_blank');});
-document.getElementById('btn-power').addEventListener('click',()=>{alert('ｼｬｲｼｬｲｼｬｰｲ');});
+    // mouse interactions for apps
+    launcher.addEventListener('click', (e) => {
+      const app = e.target.closest('.app');
+      if (!app) return;
+      const idx = apps().indexOf(app);
+      if (idx >= 0) { selectedIndex = idx; circleIndex = -1; updateSelectionUI(); }
+      if (e.target.classList.contains('delete-btn')) {
+        e.stopPropagation();
+        app.remove();
+        if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
+        updateSelectionUI();
+      }
+    });
+    launcher.addEventListener('dblclick', (e) => {
+      const app = e.target.closest('.app');
+      if (!app) return;
+      const idx = apps().indexOf(app);
+      if (idx >= 0) { selectedIndex = idx; openSelected(); }
+    });
 
-// 時間・バッテリー
-function updateTime(){document.getElementById('time').textContent=new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});}
-setInterval(updateTime,1000); updateTime();
-if(navigator.getBattery){navigator.getBattery().then(b=>{function upd(){document.getElementById('battery').textContent='🔋 '+Math.round(b.level*100)+'%';} upd(); b.addEventListener('levelchange',upd);});}
+    // bottom circle buttons actions
+    document.getElementById('btn-settings').addEventListener('click', () => {
+      try { window.open('chrome://settings/', '_blank'); } catch (e) { alert('このブラウザでは開けません。'); }
+    });
+    document.getElementById('btn-store').addEventListener('click', () => {
+      window.open('https://www.amazon.co.jp/', '_blank');
+    });
+    document.getElementById('btn-power').addEventListener('click', () => {
+      alert('ｼｬｲｼｬｲｼｬｰｲ');
+    });
 
-// 初期
-updateSelection();
-window.addEventListener('resize',()=>{setTimeout(()=>scrollSelectedIntoView(),80);});
-</script>
+    // keyboard support on buttons (Enter/Space)
+    circleBtns.forEach(btn => {
+      btn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
+      });
+    });
+
+    // GAMEPAD polling (sticks + dpad + buttons)
+    function pollGamepad(){
+      const gpList = navigator.getGamepads && navigator.getGamepads();
+      const gp = gpList ? gpList[0] : null;
+      if (gp) {
+        const buttons = gp.buttons.map(b => b.pressed);
+        const axes = gp.axes.slice(0,4); // we only need first two axes reliably
+
+        // buttons: A=0, B=1, X=2, Y=3, dpad: up=12 down=13 left=14 right=15
+        // handle transitions (edge detection)
+        // D-PAD right/left/up/down
+        if (buttons[15] && !gpPrevButtons[15]) { // dpad right
+          if (circleIndex === -1) moveApp(1); else moveCircle(1);
+        }
+        if (buttons[14] && !gpPrevButtons[14]) { // dpad left
+          if (circleIndex === -1) moveApp(-1); else moveCircle(-1);
+        }
+        if (buttons[13] && !gpPrevButtons[13]) { // dpad down
+          switchToCircle(0);
+        }
+        if (buttons[12] && !gpPrevButtons[12]) { // dpad up
+          switchToApps();
+        }
+
+        // stick horizontal (axes[0]) with edge detection flags in gpPrevAxes
+        if (axes[0] > AXIS_THRESHOLD && gpPrevAxes[0] <= AXIS_THRESHOLD) {
+          if (circleIndex === -1) moveApp(1); else moveCircle(1);
+        } else if (axes[0] < -AXIS_THRESHOLD && gpPrevAxes[0] >= -AXIS_THRESHOLD) {
+          if (circleIndex === -1) moveApp(-1); else moveCircle(-1);
+        }
+
+        // stick vertical for switching rows (axes[1])
+        if (axes[1] > AXIS_THRESHOLD && gpPrevAxes[1] <= AXIS_THRESHOLD) {
+          switchToCircle(0);
+        } else if (axes[1] < -AXIS_THRESHOLD && gpPrevAxes[1] >= -AXIS_THRESHOLD) {
+          switchToApps();
+        }
+
+        // Buttons for actions
+        if (buttons[0] && !gpPrevButtons[0]) { // A
+          openSelected();
+        }
+        if (buttons[2] && !gpPrevButtons[2]) { // X: delete
+          deleteSelectedApp();
+        }
+        if (buttons[3] && !gpPrevButtons[3]) { // Y: jump to bottom
+          switchToCircle(0);
+        }
+        if (buttons[1] && !gpPrevButtons[1]) { // B: go back to apps
+          switchToApps();
+        }
+
+        // save previous state
+        gpPrevButtons = buttons;
+        gpPrevAxes[0] = axes[0];
+        gpPrevAxes[1] = axes[1];
+      }
+      requestAnimationFrame(pollGamepad);
+    }
+    pollGamepad();
+
+    // time & battery
+    function updateTime(){ document.getElementById('time').textContent = new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}); }
+    setInterval(updateTime,1000); updateTime();
+    if (navigator.getBattery) {
+      navigator.getBattery().then(b => {
+        function upd(){ document.getElementById('battery').textContent = '🔋 ' + Math.round(b.level*100) + '%'; }
+        upd();
+        b.addEventListener('levelchange', upd);
+      });
+    }
+
+    // init
+    updateSelectionUI();
+    window.addEventListener('resize', ()=>{ setTimeout(()=>scrollSelectedIntoView(), 80); });
+
+  </script>
 </body>
 </html>
