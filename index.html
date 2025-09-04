@@ -7,7 +7,8 @@
     body {
       margin: 0;
       height: 100vh;
-      background: #e0e0e0; /* 灰色 */
+      background: linear-gradient(180deg, #0d0d0d, #1a1a1a);
+      color: white;
       font-family: "Segoe UI", sans-serif;
       display: flex;
       flex-direction: column;
@@ -21,17 +22,16 @@
       padding: 10px 20px;
       font-size: 14px;
       gap: 20px;
-      color: #555;
+      color: #ccc;
     }
 
     .launcher {
       display: flex;
-      align-items: flex-end;
+      align-items: center;
       overflow-x: auto;
-      padding: 20px 60px 20px 30px;
-      gap: 60px;
+      padding: 15px 60px 15px 30px; /* 左右に余白を追加 */
+      gap: 50px; /* アイコン間隔を少し広く */
       flex-grow: 1;
-      position: relative;
     }
 
     .app {
@@ -41,9 +41,9 @@
     }
 
     .icon {
-      width: 140px;
-      height: 140px;
-      border-radius: 18px;
+      width: 140px;  /* 少し大きく */
+      height: 140px; /* 少し大きく */
+      border-radius: 18px; 
       background: #333;
       display: flex;
       justify-content: center;
@@ -62,19 +62,14 @@
     }
 
     .app-name {
-      position: absolute;
-      top: -24px; /* アイコンの上に表示 */
-      width: 100%;
-      text-align: center;
-      color: #00bfff; /* 水色 */
-      font-weight: bold;
-      font-size: 16px;
+      margin-top: 8px;
+      font-size: 17px;
+      opacity: 0.9;
     }
 
     .selected .icon {
       transform: scale(1.25);
-      box-shadow: 0 0 28px rgba(0,191,255,0.7); /* 水色で光る */
-      z-index: 10;
+      box-shadow: 0 0 28px rgba(255,255,255,0.7);
     }
 
     .delete-btn {
@@ -99,14 +94,14 @@
     .menu {
       display: flex;
       justify-content: center;
-      gap: 35px;
+      gap: 35px; /* 少し広め */
       padding: 12px;
-      border-top: 1px solid #aaa;
+      border-top: 1px solid #444;
     }
 
     .menu-item {
       cursor: pointer;
-      font-size: 14px;
+      font-size: 14px; 
       opacity: 0.85;
       transition: opacity 0.2s;
     }
@@ -123,28 +118,24 @@
 
   <div class="launcher" id="launcher">
     <div class="app selected" data-url="https://www.google.com">
-      <div class="app-name">Google</div>
       <div class="icon"><img src="https://www.google.com/favicon.ico"></div>
-      <button class="delete-btn">×</button>
+      <div class="app-name">Google</div>
     </div>
     <div class="app" data-url="https://www.youtube.com">
-      <div class="app-name">YouTube</div>
       <div class="icon"><img src="https://www.youtube.com/favicon.ico"></div>
-      <button class="delete-btn">×</button>
+      <div class="app-name">YouTube</div>
     </div>
     <div class="app" data-url="https://discord.com">
-      <div class="app-name">Discord</div>
       <div class="icon"><img src="https://discord.com/favicon.ico"></div>
-      <button class="delete-btn">×</button>
+      <div class="app-name">Discord</div>
     </div>
     <div class="app" data-url="https://github.com">
-      <div class="app-name">GitHub</div>
       <div class="icon"><img src="https://github.com/favicon.ico"></div>
-      <button class="delete-btn">×</button>
+      <div class="app-name">GitHub</div>
     </div>
     <div class="app" id="add-app">
-      <div class="app-name">追加</div>
       <div class="icon">＋</div>
+      <div class="app-name">追加</div>
     </div>
   </div>
 
@@ -185,9 +176,9 @@
           app.className = "app";
           app.dataset.url = url;
           app.innerHTML = `
-            <div class="app-name">${name}</div>
-            <div class="icon"><img src="${new URL(url).origin + "/favicon.ico"}" alt="${name}"></div>
             <button class="delete-btn">×</button>
+            <div class="icon"><img src="${new URL(url).origin + "/favicon.ico"}" alt="${name}"></div>
+            <div class="app-name">${name}</div>
           `;
           app.querySelector(".delete-btn").addEventListener("click", (e) => {
             e.stopPropagation();
@@ -207,42 +198,38 @@
     }
 
     document.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowRight") selectedIndex = (selectedIndex + 1) % apps.length;
-      else if (e.key === "ArrowLeft") selectedIndex = (selectedIndex - 1 + apps.length) % apps.length;
-      else if (e.key === "Enter") openSelectedApp();
-      else if (e.key.toLowerCase() === "x") deleteSelectedApp();
-      updateSelection();
+      if (e.key === "ArrowRight") {
+        selectedIndex = (selectedIndex + 1) % apps.length;
+        updateSelection();
+      } else if (e.key === "ArrowLeft") {
+        selectedIndex = (selectedIndex - 1 + apps.length) % apps.length;
+        updateSelection();
+      } else if (e.key === "Enter") {
+        openSelectedApp();
+      } else if (e.key.toLowerCase() === "x") {
+        deleteSelectedApp();
+      }
     });
 
-    // ゲームパッド対応（スティック + ボタン）
-    let lastState = {};
-    let axisThreshold = 0.5;
-
+    let lastGamepadState = {};
     function pollGamepad() {
-      const gp = navigator.getGamepads()[0];
-      if (gp) {
+      const gamepads = navigator.getGamepads();
+      if (gamepads[0]) {
+        const gp = gamepads[0];
         const buttons = gp.buttons.map(b => b.pressed);
-        const axes = gp.axes;
 
-        // ボタン
-        if (buttons[15] && !lastState[15]) selectedIndex = (selectedIndex + 1) % apps.length;
-        if (buttons[14] && !lastState[14]) selectedIndex = (selectedIndex - 1 + apps.length) % apps.length;
-        if (buttons[0] && !lastState[0]) openSelectedApp();
-        if (buttons[2] && !lastState[2]) deleteSelectedApp();
+        if (buttons[15] && !lastGamepadState[15]) selectedIndex = (selectedIndex + 1) % apps.length;
+        if (buttons[14] && !lastGamepadState[14]) selectedIndex = (selectedIndex - 1 + apps.length) % apps.length;
+        if (buttons[0] && !lastGamepadState[0]) openSelectedApp();
+        if (buttons[2] && !lastGamepadState[2]) deleteSelectedApp();
 
-        // 左スティック横
-        if (axes[0] > axisThreshold && !lastState.axisRight) { selectedIndex = (selectedIndex + 1) % apps.length; lastState.axisRight = true; }
-        else if (axes[0] < -axisThreshold && !lastState.axisLeft) { selectedIndex = (selectedIndex - 1 + apps.length) % apps.length; lastState.axisLeft = true; }
-        else if (Math.abs(axes[0]) < axisThreshold) { lastState.axisRight = false; lastState.axisLeft = false; }
-
-        lastState.buttons = buttons;
         updateSelection();
+        lastGamepadState = buttons;
       }
       requestAnimationFrame(pollGamepad);
     }
     pollGamepad();
 
-    // 時間表示
     function updateTime() {
       const now = new Date();
       document.getElementById("time").textContent = now.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" });
@@ -250,7 +237,6 @@
     setInterval(updateTime, 1000);
     updateTime();
 
-    // バッテリー表示
     if (navigator.getBattery) {
       navigator.getBattery().then(battery => {
         function updateBattery() {
