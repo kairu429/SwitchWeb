@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>Switch風 Webランチャー — コントローラ対応版</title>
+  <title>Switch風 Webランチャー — 移動（隣入れ替え & ホールド差込）対応</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root{
@@ -37,8 +37,9 @@
 
     .app{
       position:relative; width:var(--icon-size); display:flex; flex-direction:column; align-items:center;
-      justify-content:flex-start; flex-shrink:0; gap:8px; transition:transform .18s ease;
+      justify-content:flex-start; flex-shrink:0; gap:8px; transition:transform .12s ease;
       touch-action: manipulation;
+      user-select:none;
     }
     .app-name{
       margin:0; padding:0 6px; font-size:14.5px; font-weight:700; color:var(--accent);
@@ -49,7 +50,7 @@
     .icon{
       width:var(--icon-size); height:var(--icon-size); border-radius:18px; background:#222;
       display:flex; align-items:center; justify-content:center; overflow:hidden;
-      box-shadow:0 6px 18px rgba(0,0,0,0.45); transition:box-shadow .18s ease, border .12s ease; position:relative; z-index:1;
+      box-shadow:0 6px 18px rgba(0,0,0,0.45); transition:box-shadow .12s ease, border .12s ease, transform .12s ease; position:relative; z-index:1;
       font-weight:700; color:#fff;
     }
     .icon img{width:100%;height:100%;object-fit:cover;display:block;border-radius:18px;}
@@ -68,6 +69,10 @@
       box-shadow:0 2px 6px rgba(0,0,0,0.4); z-index:2;
     }
     .app:hover .delete-btn{ display:block; }
+
+    /* drag / hold visual */
+    .app.dragging { transform: scale(1.04); opacity:0.95; box-shadow:0 12px 26px rgba(0,0,0,0.5); }
+    .app.hold-source { outline: 3px dashed rgba(0,191,255,0.5); outline-offset:6px; }
 
     /* 丸アイコンメニュー */
     .menu{ display:flex; justify-content:center; align-items:center; gap:40px; padding:18px 12px;
@@ -96,7 +101,7 @@
 
   <div class="launcher-wrap">
     <div class="launcher" id="launcher" role="listbox" aria-label="アプリランチャー">
-      <!-- デフォルト（クッキーがあれば上書きされる） -->
+      <!-- デフォルト（クッキーがあれば上書き） -->
       <div class="app selected" data-url="https://www.google.com" role="option" aria-selected="true">
         <div class="app-name">Google</div>
         <div class="icon"><img src="https://www.google.com/favicon.ico" alt="Google"></div>
@@ -147,7 +152,11 @@
   </div>
 
   <script>
-    /* ---------------- cookies (保存/復元) ---------------- */
+    /******************** 設定 ********************/
+    const HOLD_THRESHOLD = 300; // ms : 決定長押しやポインタ長押し判定
+    /***********************************************/
+
+    /* ---------------- Cookie utilities ---------------- */
     function setCookie(name, value, days) {
       const expires = new Date(Date.now() + days*864e5).toUTCString();
       document.cookie = name + '=' + value + '; expires=' + expires + '; path=/; SameSite=Lax';
@@ -191,7 +200,6 @@
           const newEl = createAppElement(entry.name || entry.url, entry.url);
           launcher.insertBefore(newEl, addAppEl);
         });
-        // rebind handlers for add-app (already exists)
         bindAppPointerHandlers(addAppEl);
         return true;
       } catch (e) {
@@ -200,23 +208,21 @@
       }
     }
 
-    /* ---------------- 要素と状態 ---------------- */
+    /* ---------------- elements & state ---------------- */
     const launcher = document.getElementById('launcher');
     const addAppEl = document.getElementById('add-app');
     const circleBtns = [...document.querySelectorAll('.circle-btn')];
 
-    let selectedIndex = 0;   // apps index
-    let circleIndex = -1;    // -1 = apps focused, >=0 = bottom menu focused
+    let selectedIndex = 0;
+    let circleIndex = -1;
     const apps = () => Array.from(launcher.querySelectorAll('.app'));
 
-    // input debounce
     let lastInput = 0;
-    const INPUT_COOLDOWN = 120; // ms
+    const INPUT_COOLDOWN = 120;
 
-    // gamepad prev state (initialized safely)
+    // gamepad
     let gpPrevButtons = new Array(20).fill(false);
     let gpPrevAxes = [0,0];
-    const AXIS_THRESHOLD = 0.6;
 
     function now(){ return performance.now(); }
     function canInput() {
@@ -226,31 +232,19 @@
       return true;
     }
 
-    /* ---------------- ヘルパー ---------------- */
-    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
+    /* ---------------- helpers ---------------- */
     function normalizeUrl(input){
       if (!input) return null;
-      try {
-        const u = new URL(input);
-        return u.href;
-      } catch (e){
-        try {
-          const u2 = new URL('https://' + input);
-          return u2.href;
-        } catch (e2) {
-          return null;
-        }
+      try { const u = new URL(input); return u.href; }
+      catch (e) {
+        try { const u2 = new URL('https://' + input); return u2.href; }
+        catch (e2) { return null; }
       }
     }
 
     function faviconFor(url){
-      try {
-        const u = new URL(url);
-        return u.origin + '/favicon.ico';
-      } catch (e){
-        return '';
-      }
+      try { const u = new URL(url); return u.origin + '/favicon.ico'; }
+      catch (e){ return ''; }
     }
 
     function createIconContent(name, faviconSrc){
@@ -279,27 +273,38 @@
       return icon;
     }
 
-    /* ---------------- アプリ要素作成・バインド ---------------- */
+    /* ---------------- create/bind apps ---------------- */
     function bindAppPointerHandlers(appEl){
-      appEl.addEventListener('pointerenter', (ev) => {
-        if (ev.pointerType === 'mouse') {
-          const idx = apps().indexOf(appEl);
-          if (idx >= 0) {
-            selectedIndex = idx;
-            circleIndex = -1;
-            updateSelectionUI();
-          }
-        }
-      }, {passive:true});
+      // pointer long-press => 隣入れ替えドラッグ
+      let longPressTimer = null;
+      let pointerDragState = null;
 
       appEl.addEventListener('pointerdown', (ev) => {
         const idx = apps().indexOf(appEl);
-        if (idx >= 0) {
-          selectedIndex = idx;
-          circleIndex = -1;
-          updateSelectionUI();
-        }
+        if (idx < 0) return;
+        // select immediately
+        selectedIndex = idx;
+        circleIndex = -1;
+        updateSelectionUI();
+
+        // start long-press timer to trigger swap-drag
+        longPressTimer = setTimeout(() => {
+          startPointerSwapDrag(ev, idx);
+          longPressTimer = null;
+        }, HOLD_THRESHOLD);
+
+        // store pointer id for later (so pointerup clears)
+        pointerDragState = { pointerId: ev.pointerId, moved: false };
       }, {passive:true});
+
+      // cancel longpress on pointerup/cancel/leave before threshold
+      ['pointerup','pointercancel','pointerleave'].forEach(evname => {
+        appEl.addEventListener(evname, (ev) => {
+          if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+        }, {passive:true});
+      });
+
+      // normal click/dbl handled elsewhere
     }
 
     function createAppElement(name, url){
@@ -338,7 +343,7 @@
       return el;
     }
 
-    /* ---------------- UI 更新 / スクロール ---------------- */
+    /* ---------------- UI update ---------------- */
     function updateSelectionUI(){
       apps().forEach((appEl, i) => {
         const isSelected = (circleIndex === -1 && i === selectedIndex);
@@ -350,7 +355,6 @@
           nn.style.transform = isSelected ? 'translateY(0)' : 'translateY(-4px)';
         }
       });
-
       circleBtns.forEach((btn, i) => btn.classList.toggle('selected', i === circleIndex));
       launcher.classList.toggle('compact', true);
       if (circleIndex === -1) scrollSelectedIntoView();
@@ -365,7 +369,7 @@
       launcher.scrollBy({ left: offset, behavior: 'smooth' });
     }
 
-    /* ---------------- ナビゲーションアクション ---------------- */
+    /* ---------------- navigation actions ---------------- */
     function moveApp(delta){
       if (!canInput()) return;
       const len = apps().length;
@@ -389,6 +393,7 @@
       circleIndex = -1;
       updateSelectionUI();
     }
+
     function deleteSelectedApp(){
       if (circleIndex !== -1) return;
       const a = apps()[selectedIndex];
@@ -416,7 +421,7 @@
       }
     }
 
-    /* ---------------- 追加ダイアログ ---------------- */
+    /* ---------------- Add dialog ---------------- */
     function openAddDialog(){
       const name = prompt('アプリ名を入力してください:');
       if (!name) return;
@@ -435,26 +440,19 @@
       saveAppsToCookie();
     }
 
-    // add-app click
     addAppEl.addEventListener('click', (e) => {
       e.stopPropagation();
       const idx = apps().indexOf(addAppEl);
-      if (idx >= 0) {
-        selectedIndex = idx;
-        circleIndex = -1;
-        updateSelectionUI();
-      }
+      if (idx >= 0) { selectedIndex = idx; circleIndex = -1; updateSelectionUI(); }
       openAddDialog();
     });
 
-    /* ---------------- マウス操作: 右クリックで削除 (コンテキストメニュー抑制) ---------------- */
+    /* ---------------- マウス: 右クリック削除（既存） ---------------- */
     launcher.addEventListener('contextmenu', (e) => {
       const app = e.target.closest('.app');
-      if (!app) return; // コンテキストメニュー続行（ただしここでは抑制しない）
+      if (!app) return;
       e.preventDefault();
-      // 右クリックしたアプリを削除（'追加'は除外）
       if (app.id === 'add-app') return;
-      const idx = apps().indexOf(app);
       app.remove();
       if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
       if (selectedIndex < 0) selectedIndex = 0;
@@ -462,28 +460,234 @@
       saveAppsToCookie();
     });
 
-    /* ---------------- 既存クリック/ダブルクリックハンドラ ---------------- */
-    // bind existing app elements
-    apps().forEach(bindAppPointerHandlers);
+    /* ---------------- pointer-swap-drag（長押しで隣入れ替え） ---------------- */
+    let pointerActiveDrag = null;
+    function startPointerSwapDrag(ev, startIndex){
+      // start drag swap mode for pointer operations (隣入れ替え)
+      const current = apps()[startIndex];
+      if (!current || current.id === 'add-app') return;
+      current.classList.add('dragging');
+      pointerActiveDrag = { pointerId: ev.pointerId, currentIndex: startIndex };
 
-    launcher.addEventListener('pointerdown', (e) => {
+      function onMove(e){
+        if (!pointerActiveDrag) return;
+        if (e.pointerId !== pointerActiveDrag.pointerId) return;
+        const x = e.clientX;
+        const curIdx = pointerActiveDrag.currentIndex;
+        const right = apps()[curIdx+1];
+        const left = apps()[curIdx-1];
+        if (right) {
+          const rrect = right.getBoundingClientRect();
+          const rcenter = rrect.left + rrect.width/2;
+          if (x > rcenter) {
+            // swap current with right (move right before current => right becomes left of current)
+            const curEl = apps()[curIdx];
+            const rightEl = apps()[curIdx+1];
+            launcher.insertBefore(rightEl, curEl);
+            // update index (current moved to curIdx+1)
+            pointerActiveDrag.currentIndex = apps().indexOf(curEl);
+            updateSelectionUI();
+          }
+        }
+        if (left) {
+          const lrect = left.getBoundingClientRect();
+          const lcenter = lrect.left + lrect.width/2;
+          if (x < lcenter) {
+            // swap current left by inserting current before left
+            const curEl = apps()[pointerActiveDrag.currentIndex];
+            const leftEl = apps()[pointerActiveDrag.currentIndex-1];
+            if (leftEl) launcher.insertBefore(curEl, leftEl);
+            pointerActiveDrag.currentIndex = apps().indexOf(curEl);
+            updateSelectionUI();
+          }
+        }
+      }
+
+      function onUp(e){
+        if (!pointerActiveDrag) return;
+        if (e.pointerId !== pointerActiveDrag.pointerId) return;
+        // end drag
+        const curEl = apps()[pointerActiveDrag.currentIndex];
+        if (curEl) curEl.classList.remove('dragging');
+        pointerActiveDrag = null;
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        saveAppsToCookie();
+      }
+
+      window.addEventListener('pointermove', onMove, {passive:true});
+      window.addEventListener('pointerup', onUp, {passive:true});
+    }
+
+    /* ---------------- hold-mode (決定を押しながら移動 -> リリースで差し込み) ---------------- */
+    let holdMode = {
+      active: false,
+      sourceIndex: null,
+      timer: null,
+      initiatedBy: null // 'key' | 'gamepad' | 'pointer'
+    };
+
+    function startHoldMode(sourceIndex, initiatedBy){
+      if (holdMode.active) return;
+      const src = apps()[sourceIndex];
+      if (!src || src.id === 'add-app') return;
+      holdMode.active = true;
+      holdMode.sourceIndex = sourceIndex;
+      holdMode.initiatedBy = initiatedBy || 'key';
+      src.classList.add('hold-source');
+      // keep selection on current (target) item
+      updateSelectionUI();
+    }
+
+    function endHoldModeCommit(){
+      if (!holdMode.active) return;
+      const sourceIndex = holdMode.sourceIndex;
+      const targetIndex = selectedIndex;
+      const sourceEl = apps()[sourceIndex];
+      if (!sourceEl) { cancelHoldMode(); return; }
+      // compute insertion index after removal:
+      // if sourceIndex < targetIndex => insertionIndex = targetIndex - 1 after removal
+      // else insertionIndex = targetIndex
+      // remove source first
+      sourceEl.classList.remove('hold-source');
+      const sourceNode = sourceEl;
+      // store label or node
+      // remove it
+      // note: we use apps() to reflect current DOM
+      // to avoid messing up indices, compute insertionIndex as:
+      let insertionIndex = targetIndex - (sourceIndex < targetIndex ? 1 : 0);
+      sourceNode.remove();
+      const nodesNow = apps();
+      if (insertionIndex < 0) insertionIndex = 0;
+      if (insertionIndex >= nodesNow.length) {
+        // append before add-app (which is last). nodesNow excludes add-app; but our apps() includes add-app.
+        // We want to insert before add-app element, so find add-app and insert before it.
+        const add = addAppEl;
+        launcher.insertBefore(sourceNode, add);
+      } else {
+        const beforeNode = nodesNow[insertionIndex];
+        launcher.insertBefore(sourceNode, beforeNode);
+      }
+      // update selection to indicate moved item
+      selectedIndex = apps().indexOf(sourceNode);
+      updateSelectionUI();
+      saveAppsToCookie();
+      holdMode.active = false;
+      holdMode.sourceIndex = null;
+      holdMode.initiatedBy = null;
+    }
+
+    function cancelHoldMode(){
+      if (!holdMode.active) return;
+      const src = apps()[holdMode.sourceIndex];
+      if (src) src.classList.remove('hold-source');
+      holdMode.active = false;
+      holdMode.sourceIndex = null;
+      holdMode.initiatedBy = null;
+      updateSelectionUI();
+    }
+
+    /* ---------------- keyboard: Enter 長押し（hold-mode）/ 矢印で移動 ---------------- */
+    let keyHoldTimer = null;
+    let enterDown = false;
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        if (enterDown) return;
+        enterDown = true;
+        // start hold timer
+        keyHoldTimer = setTimeout(() => {
+          // enter held -> start hold mode for selectedIndex
+          startHoldMode(selectedIndex, 'key');
+          keyHoldTimer = null;
+        }, HOLD_THRESHOLD);
+      } else {
+        // navigation handling differs when in hold-mode vs normal
+        if (!holdMode.active) {
+          if (e.key === 'ArrowRight') { moveApp(1); e.preventDefault(); }
+          else if (e.key === 'ArrowLeft') { moveApp(-1); e.preventDefault(); }
+          else if (e.key === 'ArrowDown') { switchToCircle(0); e.preventDefault(); }
+          else if (e.key === 'Backspace') { deleteSelectedApp(); e.preventDefault(); }
+          else if (e.key.toLowerCase() === 'x') { deleteSelectedApp(); e.preventDefault(); }
+        } else {
+          // hold-mode active: arrow keys change target position (move selection)
+          if (e.key === 'ArrowRight') { moveApp(1); e.preventDefault(); }
+          else if (e.key === 'ArrowLeft') { moveApp(-1); e.preventDefault(); }
+          else if (e.key === 'ArrowUp') { switchToApps(); e.preventDefault(); }
+        }
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') {
+        if (keyHoldTimer) {
+          // released before threshold -> treat as tap (決定)
+          clearTimeout(keyHoldTimer);
+          keyHoldTimer = null;
+          openSelected();
+        } else if (holdMode.active && holdMode.initiatedBy === 'key') {
+          // release after hold-mode -> commit
+          endHoldModeCommit();
+        }
+        enterDown = false;
+      }
+    });
+
+    /* ---------------- mouse click/long-press behavior for left-click "決定ホールド" ----------------
+       Note: pointer long-press already triggers swap-drag above.
+       We will also allow left-click hold (on body) to be used as hold-mode (差し込み) if the user clicks while selected.
+       To avoid conflict, we consider long-press on an app starts pointer-swap-drag (handled in bind). For global left button (on selected item),
+       we provide Enter-like hold behavior: mousedown on selected icon -> start timer for hold-mode; if released quickly -> open; if held -> hold-mode.
+    */
+    let pointerHoldState = { timer: null, activeForIndex: null };
+
+    // attach mousedown/up on launcher to detect left-button holds on currently selected app
+    launcher.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return; // only left
       const app = e.target.closest('.app');
       if (!app) return;
       const idx = apps().indexOf(app);
-      if (idx >= 0) {
-        selectedIndex = idx;
-        circleIndex = -1;
-        updateSelectionUI();
+      if (idx < 0) return;
+      // if this pointerdown was long-press handled by bindAppPointerHandlers -> pointer-swap-drag will take over.
+      // But we still set a separate timer to start hold-mode if the user keeps holding (for decision-hold behavior).
+      pointerHoldState.timer = setTimeout(() => {
+        // enter hold-mode (decision-hold) for that index
+        startHoldMode(idx, 'pointer');
+        pointerHoldState.activeForIndex = idx;
+        pointerHoldState.timer = null;
+      }, HOLD_THRESHOLD);
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (e.button !== 0) return;
+      if (pointerHoldState.timer) {
+        // released before threshold: treat as click (決定)
+        clearTimeout(pointerHoldState.timer);
+        pointerHoldState.timer = null;
+        // perform click behavior: if clicked selected -> open, else select
+        const app = e.target.closest('.app');
+        if (!app) return;
+        const idx = apps().indexOf(app);
+        if (idx === selectedIndex) openSelected(); else { selectedIndex = idx; updateSelectionUI(); }
+      } else if (pointerHoldState.activeForIndex != null) {
+        // released after hold-mode initiation by pointer -> commit hold-mode move if active
+        if (holdMode.active && holdMode.initiatedBy === 'pointer') {
+          endHoldModeCommit();
+        } else {
+          cancelHoldMode();
+        }
+        pointerHoldState.activeForIndex = null;
       }
     }, {passive:true});
 
+    /* ---------------- click/dblclick handlers (通常クリック → 決定) ---------------- */
+    // basic click handled earlier for add/delete etc. But ensure single-click open when clicking selected:
     launcher.addEventListener('click', (e) => {
       const app = e.target.closest('.app');
       if (!app) return;
       const idx = apps().indexOf(app);
       if (idx < 0) return;
 
-      // delete button（左上の×）
+      // delete button
       if (e.target.classList.contains('delete-btn')) {
         e.stopPropagation();
         const toDel = e.target.closest('.app');
@@ -494,8 +698,8 @@
         return;
       }
 
-      // 同じアイテムをクリックしたら開く
-      if (circleIndex === -1 && idx === selectedIndex) {
+      // left-click: if same item -> open, else select
+      if (idx === selectedIndex) {
         openSelected();
       } else {
         selectedIndex = idx;
@@ -517,49 +721,21 @@
     /* ---------------- 下段ボタンホバー/クリック ---------------- */
     circleBtns.forEach((btn, i) => {
       btn.addEventListener('pointerenter', (ev) => {
-        if (ev.pointerType === 'mouse') {
-          circleIndex = i;
-          updateSelectionUI();
-        }
+        if (ev.pointerType === 'mouse') { circleIndex = i; updateSelectionUI(); }
       }, {passive:true});
-      btn.addEventListener('pointerdown', (ev) => {
-        circleIndex = i;
-        updateSelectionUI();
-      }, {passive:true});
+      btn.addEventListener('pointerdown', (ev) => { circleIndex = i; updateSelectionUI(); }, {passive:true});
     });
 
     document.getElementById('btn-settings').addEventListener('click', () => {
       try { window.open('chrome://settings/', '_blank'); } catch (e) { alert('このブラウザでは開けません。'); }
     });
-    document.getElementById('btn-store').addEventListener('click', () => {
-      window.open('https://www.amazon.co.jp/', '_blank');
-    });
-    document.getElementById('btn-power').addEventListener('click', () => {
-      alert('ｼｬｲｼｬｲｼｬｰｲ');
-    });
+    document.getElementById('btn-store').addEventListener('click', () => { window.open('https://www.amazon.co.jp/', '_blank'); });
+    document.getElementById('btn-power').addEventListener('click', () => { alert('ｼｬｲｼｬｲｼｬｰｲ'); });
 
-    /* ---------------- キーボード ---------------- */
-    document.addEventListener('keydown', (e) => {
-      if (circleIndex === -1) {
-        if (e.key === 'ArrowRight') { moveApp(1); e.preventDefault(); }
-        else if (e.key === 'ArrowLeft') { moveApp(-1); e.preventDefault(); }
-        else if (e.key === 'ArrowDown') { switchToCircle(0); e.preventDefault(); }
-        else if (e.key === 'Enter') { openSelected(); e.preventDefault(); }
-        else if (e.key === 'Backspace') { deleteSelectedApp(); e.preventDefault(); }
-        else if (e.key.toLowerCase() === 'x') { deleteSelectedApp(); e.preventDefault(); } // 以前のXキーも維持
-      } else {
-        if (e.key === 'ArrowRight') { moveCircle(1); e.preventDefault(); }
-        else if (e.key === 'ArrowLeft') { moveCircle(-1); e.preventDefault(); }
-        else if (e.key === 'ArrowUp') { switchToApps(); e.preventDefault(); }
-        else if (e.key === 'Enter') { openSelected(); e.preventDefault(); }
-      }
-    });
+    /* ---------------- keyboard navigation (矢印等) は上で分岐させている ---------------- */
 
-    /* ---------------- ゲームパッド（Xboxコントローラー） ----------------
-       mapping: standard gamepad mapping
-       0=A, 1=B, 2=X, 3=Y, 12=up,13=down,14=left,15=right
-       axes[0]=left stick X, axes[1]=left stick Y
-    --------------------------------------------------------------- */
+    /* ---------------- gamepad: A の長押しで hold-mode、短押しで決定、Xで削除、Yで追加 ---------------- */
+    let gpButtonDownTime = {};
     function pollGamepad(){
       const gpList = navigator.getGamepads && navigator.getGamepads();
       const gp = gpList ? gpList[0] : null;
@@ -567,28 +743,48 @@
         const buttons = gp.buttons.map(b => !!b.pressed);
         const axes = gp.axes.slice(0,4);
 
-        // D-Pad (edge detect)
-        if (buttons[15] && !gpPrevButtons[15]) { if (circleIndex === -1) moveApp(1); else moveCircle(1); } // right
-        if (buttons[14] && !gpPrevButtons[14]) { if (circleIndex === -1) moveApp(-1); else moveCircle(-1); } // left
-        if (buttons[13] && !gpPrevButtons[13]) { switchToCircle(0); } // down -> to bottom
-        if (buttons[12] && !gpPrevButtons[12]) { switchToApps(); } // up -> to apps
+        // D-Pad edge detect for immediate navigation
+        if (buttons[15] && !gpPrevButtons[15]) { if (!holdMode.active) { moveApp(1); } else { moveApp(1); } } // right
+        if (buttons[14] && !gpPrevButtons[14]) { if (!holdMode.active) { moveApp(-1); } else { moveApp(-1); } } // left
+        if (buttons[13] && !gpPrevButtons[13]) { switchToCircle(0); } // down -> bottom
+        if (buttons[12] && !gpPrevButtons[12]) { switchToApps(); } // up -> apps
 
         // Left stick horizontal (edge)
-        if (axes[0] > AXIS_THRESHOLD && gpPrevAxes[0] <= AXIS_THRESHOLD) { if (circleIndex === -1) moveApp(1); else moveCircle(1); }
-        else if (axes[0] < -AXIS_THRESHOLD && gpPrevAxes[0] >= -AXIS_THRESHOLD) { if (circleIndex === -1) moveApp(-1); else moveCircle(-1); }
-
+        if (axes[0] > 0.6 && gpPrevAxes[0] <= 0.6) { moveApp(1); }
+        else if (axes[0] < -0.6 && gpPrevAxes[0] >= -0.6) { moveApp(-1); }
         // Left stick vertical (edge)
-        if (axes[1] > AXIS_THRESHOLD && gpPrevAxes[1] <= AXIS_THRESHOLD) { switchToCircle(0); }
-        else if (axes[1] < -AXIS_THRESHOLD && gpPrevAxes[1] >= -AXIS_THRESHOLD) { switchToApps(); }
+        if (axes[1] > 0.6 && gpPrevAxes[1] <= 0.6) { switchToCircle(0); }
+        else if (axes[1] < -0.6 && gpPrevAxes[1] >= -0.6) { switchToApps(); }
 
-        // Buttons (edge)
-        if (buttons[0] && !gpPrevButtons[0]) { openSelected(); } // A -> 決定
-        if (buttons[2] && !gpPrevButtons[2]) { deleteSelectedApp(); } // X -> 削除
-        if (buttons[3] && !gpPrevButtons[3]) { openAddDialog(); } // Y -> 追加
+        // Buttons behavior with hold detection for A (0)
+        // Track down time
+        if (buttons[0] && !gpPrevButtons[0]) { gpButtonDownTime['A'] = now(); } // down
+        if (!buttons[0] && gpPrevButtons[0]) { // up
+          const down = gpButtonDownTime['A'] || 0;
+          const dur = now() - down;
+          delete gpButtonDownTime['A'];
+          if (dur < HOLD_THRESHOLD && !holdMode.active) {
+            // short press -> 決定
+            openSelected();
+          } else if (holdMode.active && holdMode.initiatedBy === 'gamepad') {
+            // release after hold-mode -> commit
+            endHoldModeCommit();
+          } else {
+            cancelHoldMode();
+          }
+        }
+        // while held, if now - down >= HOLD_THRESHOLD and holdMode not active => start hold-mode
+        if (buttons[0] && !holdMode.active && gpButtonDownTime['A'] && (now() - gpButtonDownTime['A'] >= HOLD_THRESHOLD)) {
+          startHoldMode(selectedIndex, 'gamepad');
+        }
 
-        // ignore LB(4), RB(5), LT(6), RT(7) intentionally
+        // X short press -> delete
+        if (buttons[2] && !gpPrevButtons[2]) { deleteSelectedApp(); } // X
 
-        // save prev state
+        // Y short press -> add (they wanted Y = 追加). If long-press desired, could add but keep short press.
+        if (buttons[3] && !gpPrevButtons[3]) { openAddDialog(); }
+
+        // save prev
         gpPrevButtons = buttons;
         gpPrevAxes[0] = axes[0];
         gpPrevAxes[1] = axes[1];
@@ -614,7 +810,12 @@
     updateSelectionUI();
     bindAppPointerHandlers(addAppEl);
 
+    // ensure keyboard/resize behaviors
     window.addEventListener('resize', ()=>{ setTimeout(()=>scrollSelectedIntoView(), 80); });
+
+    /* ---------------- 保存タイミング注意 ---------------- */
+    // saveAppsToCookie() は
+    // ・削除時、追加時、長押しドラッグ終了時（隣入れ替え）、ホールド差込のコミット時 に呼んでいる
   </script>
 </body>
 </html>
