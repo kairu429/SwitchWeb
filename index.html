@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>Switch風 Webランチャー — 追加対応版（クッキー保存）</title>
+  <title>Switch風 Webランチャー — コントローラ対応版</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root{
@@ -96,7 +96,7 @@
 
   <div class="launcher-wrap">
     <div class="launcher" id="launcher" role="listbox" aria-label="アプリランチャー">
-      <!-- 初期のデフォルトはそのまま置いてありますが、クッキーが存在すれば上書きされます -->
+      <!-- デフォルト（クッキーがあれば上書きされる） -->
       <div class="app selected" data-url="https://www.google.com" role="option" aria-selected="true">
         <div class="app-name">Google</div>
         <div class="icon"><img src="https://www.google.com/favicon.ico" alt="Google"></div>
@@ -121,7 +121,7 @@
         <button class="delete-btn" title="削除">×</button>
       </div>
 
-      <!-- 追加ボタン（これを押すと追加ダイアログを出す） -->
+      <!-- 追加ボタン -->
       <div class="app" id="add-app" role="option" aria-selected="false">
         <div class="app-name">追加</div>
         <div class="icon">＋</div>
@@ -147,7 +147,7 @@
   </div>
 
   <script>
-    // ---- Cookie utilities (保存・読み込み) ----
+    /* ---------------- cookies (保存/復元) ---------------- */
     function setCookie(name, value, days) {
       const expires = new Date(Date.now() + days*864e5).toUTCString();
       document.cookie = name + '=' + value + '; expires=' + expires + '; path=/; SameSite=Lax';
@@ -171,7 +171,6 @@
         });
         const json = encodeURIComponent(JSON.stringify(list));
         setCookie('switch_launcher_apps', json, 365);
-        //console.log('saved cookie', list);
       } catch (e) {
         console.error('saveAppsToCookie error', e);
       }
@@ -201,7 +200,7 @@
       }
     }
 
-    // ---- state & elements ----
+    /* ---------------- 要素と状態 ---------------- */
     const launcher = document.getElementById('launcher');
     const addAppEl = document.getElementById('add-app');
     const circleBtns = [...document.querySelectorAll('.circle-btn')];
@@ -214,10 +213,10 @@
     let lastInput = 0;
     const INPUT_COOLDOWN = 120; // ms
 
-    // gamepad prev state
-    let gpPrevButtons = [];
+    // gamepad prev state (initialized safely)
+    let gpPrevButtons = new Array(20).fill(false);
     let gpPrevAxes = [0,0];
-    const AXIS_THRESHOLD = 0.5;
+    const AXIS_THRESHOLD = 0.6;
 
     function now(){ return performance.now(); }
     function canInput() {
@@ -227,17 +226,15 @@
       return true;
     }
 
-    // ---- helpers ----
+    /* ---------------- ヘルパー ---------------- */
     function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
     function normalizeUrl(input){
       if (!input) return null;
       try {
-        // if absolute or has protocol
         const u = new URL(input);
         return u.href;
       } catch (e){
-        // try adding https://
         try {
           const u2 = new URL('https://' + input);
           return u2.href;
@@ -264,7 +261,6 @@
         img.src = faviconSrc;
         img.alt = name;
         img.onerror = () => {
-          // fallback: show initials
           icon.innerHTML = '';
           const txt = document.createElement('div');
           txt.textContent = (name && name[0]) ? name[0].toUpperCase() : '•';
@@ -274,9 +270,8 @@
         };
         icon.appendChild(img);
       } else {
-        // no favicon
         const txt = document.createElement('div');
-        txt.textContent = (name && name[0]) ? name[0][0].toUpperCase() : '•';
+        txt.textContent = (name && name[0]) ? name[0].toUpperCase() : '•';
         txt.style.fontSize = '48px';
         txt.style.fontWeight = '700';
         icon.appendChild(txt);
@@ -284,9 +279,8 @@
       return icon;
     }
 
-    // bind pointer hover handlers for app element
+    /* ---------------- アプリ要素作成・バインド ---------------- */
     function bindAppPointerHandlers(appEl){
-      // hover selection when using a mouse
       appEl.addEventListener('pointerenter', (ev) => {
         if (ev.pointerType === 'mouse') {
           const idx = apps().indexOf(appEl);
@@ -298,7 +292,6 @@
         }
       }, {passive:true});
 
-      // pointerdown select quickly (touch / pen / mouse)
       appEl.addEventListener('pointerdown', (ev) => {
         const idx = apps().indexOf(appEl);
         if (idx >= 0) {
@@ -309,7 +302,6 @@
       }, {passive:true});
     }
 
-    // create an app DOM element and bind handlers; returns element
     function createAppElement(name, url){
       const el = document.createElement('div');
       el.className = 'app';
@@ -328,12 +320,10 @@
       delBtn.title = '削除';
       delBtn.textContent = '×';
 
-      // delete handler
       delBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const idx = apps().indexOf(el);
         el.remove();
-        // adjust selectedIndex
         if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
         if (selectedIndex < 0) selectedIndex = 0;
         updateSelectionUI();
@@ -344,13 +334,11 @@
       el.appendChild(iconWrapper);
       el.appendChild(delBtn);
 
-      // bind hover/select handlers
       bindAppPointerHandlers(el);
-
       return el;
     }
 
-    // ---- selection UI update ----
+    /* ---------------- UI 更新 / スクロール ---------------- */
     function updateSelectionUI(){
       apps().forEach((appEl, i) => {
         const isSelected = (circleIndex === -1 && i === selectedIndex);
@@ -377,7 +365,7 @@
       launcher.scrollBy({ left: offset, behavior: 'smooth' });
     }
 
-    // ---- navigation actions ----
+    /* ---------------- ナビゲーションアクション ---------------- */
     function moveApp(delta){
       if (!canInput()) return;
       const len = apps().length;
@@ -418,21 +406,18 @@
         const a = apps()[selectedIndex];
         if (!a) return;
         if (a.id === 'add-app'){
-          // open add dialog
           openAddDialog();
         } else {
           const url = a.dataset.url;
           if (url) window.open(url, '_blank');
         }
       } else {
-        // trigger bottom button
         if (circleIndex >= 0 && circleIndex < circleBtns.length) circleBtns[circleIndex].click();
       }
     }
 
-    // ---- Add app dialog & insertion ----
+    /* ---------------- 追加ダイアログ ---------------- */
     function openAddDialog(){
-      // simple prompts (name, url). normalize URL, create app.
       const name = prompt('アプリ名を入力してください:');
       if (!name) return;
       let urlInput = prompt('URLを入力してください: (例: example.com または https://example.com)');
@@ -444,32 +429,43 @@
       }
       const newEl = createAppElement(name, normalized);
       launcher.insertBefore(newEl, addAppEl);
-      // select the newly added
       selectedIndex = apps().indexOf(newEl);
       circleIndex = -1;
       updateSelectionUI();
       saveAppsToCookie();
     }
 
-    // direct click handler on add-app element (instant)
+    // add-app click
     addAppEl.addEventListener('click', (e) => {
       e.stopPropagation();
-      // select add-app visually first
       const idx = apps().indexOf(addAppEl);
       if (idx >= 0) {
         selectedIndex = idx;
         circleIndex = -1;
         updateSelectionUI();
       }
-      // open dialog
       openAddDialog();
     });
 
-    // ---- pointer / mouse / touch interactions ----
-    // bind existing app elements for hover/select
+    /* ---------------- マウス操作: 右クリックで削除 (コンテキストメニュー抑制) ---------------- */
+    launcher.addEventListener('contextmenu', (e) => {
+      const app = e.target.closest('.app');
+      if (!app) return; // コンテキストメニュー続行（ただしここでは抑制しない）
+      e.preventDefault();
+      // 右クリックしたアプリを削除（'追加'は除外）
+      if (app.id === 'add-app') return;
+      const idx = apps().indexOf(app);
+      app.remove();
+      if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
+      if (selectedIndex < 0) selectedIndex = 0;
+      updateSelectionUI();
+      saveAppsToCookie();
+    });
+
+    /* ---------------- 既存クリック/ダブルクリックハンドラ ---------------- */
+    // bind existing app elements
     apps().forEach(bindAppPointerHandlers);
 
-    // pointer click: selection + opening behavior (already handled in pointerdown and click/dbl)
     launcher.addEventListener('pointerdown', (e) => {
       const app = e.target.closest('.app');
       if (!app) return;
@@ -487,7 +483,7 @@
       const idx = apps().indexOf(app);
       if (idx < 0) return;
 
-      // delete button
+      // delete button（左上の×）
       if (e.target.classList.contains('delete-btn')) {
         e.stopPropagation();
         const toDel = e.target.closest('.app');
@@ -498,7 +494,7 @@
         return;
       }
 
-      // if clicked currently selected -> open
+      // 同じアイテムをクリックしたら開く
       if (circleIndex === -1 && idx === selectedIndex) {
         openSelected();
       } else {
@@ -518,7 +514,7 @@
       }
     });
 
-    // hover for bottom circle buttons
+    /* ---------------- 下段ボタンホバー/クリック ---------------- */
     circleBtns.forEach((btn, i) => {
       btn.addEventListener('pointerenter', (ev) => {
         if (ev.pointerType === 'mouse') {
@@ -532,7 +528,6 @@
       }, {passive:true});
     });
 
-    // bottom circle actions
     document.getElementById('btn-settings').addEventListener('click', () => {
       try { window.open('chrome://settings/', '_blank'); } catch (e) { alert('このブラウザでは開けません。'); }
     });
@@ -543,21 +538,15 @@
       alert('ｼｬｲｼｬｲｼｬｰｲ');
     });
 
-    // keyboard support for circle buttons (Enter/Space)
-    circleBtns.forEach(btn => {
-      btn.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); btn.click(); }
-      });
-    });
-
-    // ---- keyboard navigation ----
+    /* ---------------- キーボード ---------------- */
     document.addEventListener('keydown', (e) => {
       if (circleIndex === -1) {
         if (e.key === 'ArrowRight') { moveApp(1); e.preventDefault(); }
         else if (e.key === 'ArrowLeft') { moveApp(-1); e.preventDefault(); }
         else if (e.key === 'ArrowDown') { switchToCircle(0); e.preventDefault(); }
         else if (e.key === 'Enter') { openSelected(); e.preventDefault(); }
-        else if (e.key.toLowerCase() === 'x') { deleteSelectedApp(); e.preventDefault(); }
+        else if (e.key === 'Backspace') { deleteSelectedApp(); e.preventDefault(); }
+        else if (e.key.toLowerCase() === 'x') { deleteSelectedApp(); e.preventDefault(); } // 以前のXキーも維持
       } else {
         if (e.key === 'ArrowRight') { moveCircle(1); e.preventDefault(); }
         else if (e.key === 'ArrowLeft') { moveCircle(-1); e.preventDefault(); }
@@ -566,34 +555,40 @@
       }
     });
 
-    // ---- gamepad (sticks/dpad/buttons) ----
+    /* ---------------- ゲームパッド（Xboxコントローラー） ----------------
+       mapping: standard gamepad mapping
+       0=A, 1=B, 2=X, 3=Y, 12=up,13=down,14=left,15=right
+       axes[0]=left stick X, axes[1]=left stick Y
+    --------------------------------------------------------------- */
     function pollGamepad(){
       const gpList = navigator.getGamepads && navigator.getGamepads();
       const gp = gpList ? gpList[0] : null;
       if (gp) {
-        const buttons = gp.buttons.map(b => b.pressed);
+        const buttons = gp.buttons.map(b => !!b.pressed);
         const axes = gp.axes.slice(0,4);
 
-        // dpad
-        if (buttons[15] && !gpPrevButtons[15]) { if (circleIndex === -1) moveApp(1); else moveCircle(1); }
-        if (buttons[14] && !gpPrevButtons[14]) { if (circleIndex === -1) moveApp(-1); else moveCircle(-1); }
-        if (buttons[13] && !gpPrevButtons[13]) { switchToCircle(0); }
-        if (buttons[12] && !gpPrevButtons[12]) { switchToApps(); }
+        // D-Pad (edge detect)
+        if (buttons[15] && !gpPrevButtons[15]) { if (circleIndex === -1) moveApp(1); else moveCircle(1); } // right
+        if (buttons[14] && !gpPrevButtons[14]) { if (circleIndex === -1) moveApp(-1); else moveCircle(-1); } // left
+        if (buttons[13] && !gpPrevButtons[13]) { switchToCircle(0); } // down -> to bottom
+        if (buttons[12] && !gpPrevButtons[12]) { switchToApps(); } // up -> to apps
 
-        // stick horizontal
+        // Left stick horizontal (edge)
         if (axes[0] > AXIS_THRESHOLD && gpPrevAxes[0] <= AXIS_THRESHOLD) { if (circleIndex === -1) moveApp(1); else moveCircle(1); }
         else if (axes[0] < -AXIS_THRESHOLD && gpPrevAxes[0] >= -AXIS_THRESHOLD) { if (circleIndex === -1) moveApp(-1); else moveCircle(-1); }
 
-        // stick vertical
+        // Left stick vertical (edge)
         if (axes[1] > AXIS_THRESHOLD && gpPrevAxes[1] <= AXIS_THRESHOLD) { switchToCircle(0); }
         else if (axes[1] < -AXIS_THRESHOLD && gpPrevAxes[1] >= -AXIS_THRESHOLD) { switchToApps(); }
 
-        // buttons
-        if (buttons[0] && !gpPrevButtons[0]) { openSelected(); } // A
-        if (buttons[2] && !gpPrevButtons[2]) { deleteSelectedApp(); } // X
-        if (buttons[3] && !gpPrevButtons[3]) { switchToCircle(0); } // Y
-        if (buttons[1] && !gpPrevButtons[1]) { switchToApps(); } // B
+        // Buttons (edge)
+        if (buttons[0] && !gpPrevButtons[0]) { openSelected(); } // A -> 決定
+        if (buttons[2] && !gpPrevButtons[2]) { deleteSelectedApp(); } // X -> 削除
+        if (buttons[3] && !gpPrevButtons[3]) { openAddDialog(); } // Y -> 追加
 
+        // ignore LB(4), RB(5), LT(6), RT(7) intentionally
+
+        // save prev state
         gpPrevButtons = buttons;
         gpPrevAxes[0] = axes[0];
         gpPrevAxes[1] = axes[1];
@@ -602,7 +597,7 @@
     }
     pollGamepad();
 
-    // ---- time & battery ----
+    /* ---------------- 時刻・バッテリー ---------------- */
     function updateTime(){ document.getElementById('time').textContent = new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}); }
     setInterval(updateTime,1000); updateTime();
     if (navigator.getBattery) {
@@ -613,13 +608,10 @@
       });
     }
 
-    // ---- init ----
-    // まずクッキーから復元を試みる。存在しなければページ内のデフォルトをそのまま使う。
+    /* ---------------- 初期化 ---------------- */
     const restored = loadAppsFromCookie();
-    // bind newly created items if any
     apps().forEach(bindAppPointerHandlers);
     updateSelectionUI();
-    // ensure add-app has handlers to be consistent (hover/select)
     bindAppPointerHandlers(addAppEl);
 
     window.addEventListener('resize', ()=>{ setTimeout(()=>scrollSelectedIntoView(), 80); });
