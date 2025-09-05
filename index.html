@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>Switch風 Webランチャー — 追加対応版</title>
+  <title>Switch風 Webランチャー — 追加対応版（クッキー保存）</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root{
@@ -96,6 +96,7 @@
 
   <div class="launcher-wrap">
     <div class="launcher" id="launcher" role="listbox" aria-label="アプリランチャー">
+      <!-- 初期のデフォルトはそのまま置いてありますが、クッキーが存在すれば上書きされます -->
       <div class="app selected" data-url="https://www.google.com" role="option" aria-selected="true">
         <div class="app-name">Google</div>
         <div class="icon"><img src="https://www.google.com/favicon.ico" alt="Google"></div>
@@ -146,6 +147,60 @@
   </div>
 
   <script>
+    // ---- Cookie utilities (保存・読み込み) ----
+    function setCookie(name, value, days) {
+      const expires = new Date(Date.now() + days*864e5).toUTCString();
+      document.cookie = name + '=' + value + '; expires=' + expires + '; path=/; SameSite=Lax';
+    }
+    function getCookie(name) {
+      return document.cookie.split('; ').reduce((r, v) => {
+        const parts = v.split('=');
+        return parts[0] === name ? parts.slice(1).join('=') : r;
+      }, '');
+    }
+
+    function saveAppsToCookie() {
+      try {
+        const list = [];
+        Array.from(launcher.querySelectorAll('.app')).forEach(appEl => {
+          if (appEl.id === 'add-app') return;
+          const nameEl = appEl.querySelector('.app-name');
+          const name = nameEl ? nameEl.textContent : '';
+          const url = appEl.dataset.url || '';
+          list.push({name, url});
+        });
+        const json = encodeURIComponent(JSON.stringify(list));
+        setCookie('switch_launcher_apps', json, 365);
+        //console.log('saved cookie', list);
+      } catch (e) {
+        console.error('saveAppsToCookie error', e);
+      }
+    }
+
+    function loadAppsFromCookie() {
+      const raw = getCookie('switch_launcher_apps');
+      if (!raw) return false;
+      try {
+        const arr = JSON.parse(decodeURIComponent(raw));
+        if (!Array.isArray(arr)) return false;
+        // remove existing apps except add-app
+        const current = Array.from(launcher.querySelectorAll('.app'));
+        current.forEach(el => { if (el.id !== 'add-app') el.remove(); });
+        // insert from cookie
+        arr.forEach(entry => {
+          if (!entry || !entry.url) return;
+          const newEl = createAppElement(entry.name || entry.url, entry.url);
+          launcher.insertBefore(newEl, addAppEl);
+        });
+        // rebind handlers for add-app (already exists)
+        bindAppPointerHandlers(addAppEl);
+        return true;
+      } catch (e) {
+        console.error('loadAppsFromCookie parse error', e);
+        return false;
+      }
+    }
+
     // ---- state & elements ----
     const launcher = document.getElementById('launcher');
     const addAppEl = document.getElementById('add-app');
@@ -221,7 +276,7 @@
       } else {
         // no favicon
         const txt = document.createElement('div');
-        txt.textContent = (name && name[0]) ? name[0].toUpperCase() : '•';
+        txt.textContent = (name && name[0]) ? name[0][0].toUpperCase() : '•';
         txt.style.fontSize = '48px';
         txt.style.fontWeight = '700';
         icon.appendChild(txt);
@@ -282,6 +337,7 @@
         if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
         if (selectedIndex < 0) selectedIndex = 0;
         updateSelectionUI();
+        saveAppsToCookie();
       });
 
       el.appendChild(nameEl);
@@ -353,6 +409,7 @@
         if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
         if (selectedIndex < 0) selectedIndex = 0;
         updateSelectionUI();
+        saveAppsToCookie();
       }
     }
 
@@ -391,6 +448,7 @@
       selectedIndex = apps().indexOf(newEl);
       circleIndex = -1;
       updateSelectionUI();
+      saveAppsToCookie();
     }
 
     // direct click handler on add-app element (instant)
@@ -436,6 +494,7 @@
         toDel.remove();
         if (selectedIndex >= apps().length) selectedIndex = apps().length - 1;
         updateSelectionUI();
+        saveAppsToCookie();
         return;
       }
 
@@ -555,6 +614,10 @@
     }
 
     // ---- init ----
+    // まずクッキーから復元を試みる。存在しなければページ内のデフォルトをそのまま使う。
+    const restored = loadAppsFromCookie();
+    // bind newly created items if any
+    apps().forEach(bindAppPointerHandlers);
     updateSelectionUI();
     // ensure add-app has handlers to be consistent (hover/select)
     bindAppPointerHandlers(addAppEl);
