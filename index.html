@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>Switch風 Webランチャー — 削除で遷移しない対応</title>
+  <title>Switch風 Webランチャー — Bボタンでキャンセル対応</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root{
@@ -214,7 +214,6 @@
 
     function markDeleteAction() {
       lastActionWasDelete = true;
-      // 少し経ったらフラグをクリア（念のため保険）
       setTimeout(() => { lastActionWasDelete = false; }, 300);
     }
 
@@ -387,10 +386,8 @@
       delBtn.textContent = '×';
 
       delBtn.addEventListener('click', (e) => {
-        // stop any navigation that might follow from the same interaction
         e.stopPropagation();
         e.preventDefault();
-        // mark delete to prevent subsequent click/up opening the site
         markDeleteAction();
         const idx = apps().indexOf(el);
         el.remove();
@@ -474,7 +471,6 @@
 
     function openSelected(){
       if (lastActionWasDelete) {
-        // 削除直後の誤開きを防ぐ
         lastActionWasDelete = false;
         return;
       }
@@ -753,7 +749,6 @@
 
     window.addEventListener('mouseup', (e) => {
       if (e.button !== 0) return;
-      // 防御: 直前に削除が発生していたら開く処理をキャンセル
       if (lastActionWasDelete) { lastActionWasDelete = false; if (pointerHoldState.timer) { clearTimeout(pointerHoldState.timer); pointerHoldState.timer = null; } return; }
 
       if (pointerHoldState.timer) {
@@ -775,7 +770,6 @@
 
     /* ---------------- click/dblclick handlers (通常クリック → 決定) ---------------- */
     launcher.addEventListener('click', (e) => {
-      // 削除直後の誤トリガを防ぐ
       if (lastActionWasDelete) { lastActionWasDelete = false; return; }
 
       if (addModal.style.display === 'flex') return;
@@ -787,7 +781,6 @@
       if (e.target.classList.contains('delete-btn')) {
         e.stopPropagation();
         e.preventDefault();
-        // safety handled in delete button handler already, but keep defensive
         return;
       }
 
@@ -844,6 +837,7 @@
         if (axes[1] > 0.6 && gpPrevAxes[1] <= 0.6) { switchToCircle(0); }
         else if (axes[1] < -0.6 && gpPrevAxes[1] >= -0.6) { switchToApps(); }
 
+        // A (決定 / hold-mode)
         if (buttons[0] && !gpPrevButtons[0]) { gpButtonDownTime['A'] = now(); }
         if (!buttons[0] && gpPrevButtons[0]) {
           const down = gpButtonDownTime['A'] || 0;
@@ -857,8 +851,22 @@
           startHoldMode(selectedIndex, 'gamepad');
         }
 
+        // X (削除)
         if (buttons[2] && !gpPrevButtons[2]) { deleteSelectedApp(); }
+
+        // Y (追加 -> open modal)
         if (buttons[3] && !gpPrevButtons[3]) { showAddModal(); }
+
+        // B (キャンセル) -- 追加: モーダルが開いているときはキャンセル（閉じる）する
+        if (buttons[1] && !gpPrevButtons[1]) {
+          if (addModal.style.display === 'flex') {
+            // close modal as cancel
+            hideAddModal();
+          } else {
+            // fallback behavior when modal closed: go back to apps (or no-op)
+            switchToApps();
+          }
+        }
 
         gpPrevButtons = buttons;
         gpPrevAxes[0] = axes[0];
