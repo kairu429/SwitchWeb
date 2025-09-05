@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <title>Switch風 Webランチャー — ホバーで選択対応版</title>
+  <title>Switch風 Webランチャー — ページ内でURL追加（モーダル）対応</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     :root{
@@ -12,11 +12,14 @@
       --icon-size:140px;
       --gap:50px;
       --circle-size:64px;
+      --modal-bg: rgba(0,0,0,0.6);
+      --white: #ffffff;
+      --muted: #cfcfcf;
     }
     html,body{height:100%;margin:0;}
     body{
       background: linear-gradient(180deg,var(--bg1),var(--bg2));
-      color:#fff;
+      color:var(--white);
       font-family:"Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial;
       display:flex;
       flex-direction:column;
@@ -25,8 +28,8 @@
       -moz-osx-font-smoothing:grayscale;
     }
 
-    .topbar{display:flex;align-items:center;justify-content:flex-end;padding:10px 24px;color:#cfcfcf;gap:12px;}
-    .status-right{display:flex; gap:14px; align-items:center; color:#bfbfbf;}
+    .topbar{display:flex;align-items:center;justify-content:flex-end;padding:10px 24px;color:var(--muted);gap:12px;}
+    .status-right{display:flex; gap:14px; align-items:center; color:var(--muted);}
 
     .launcher-wrap{position:relative; flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden;}
     .launcher{
@@ -51,7 +54,7 @@
       width:var(--icon-size); height:var(--icon-size); border-radius:18px; background:#222;
       display:flex; align-items:center; justify-content:center; overflow:hidden;
       box-shadow:0 6px 18px rgba(0,0,0,0.45); transition:box-shadow .12s ease, border .12s ease, transform .12s ease; position:relative; z-index:1;
-      font-weight:700; color:#fff;
+      font-weight:700; color:var(--white);
     }
     .icon img{width:100%;height:100%;object-fit:cover;display:block;border-radius:18px;}
 
@@ -65,7 +68,7 @@
 
     .delete-btn{
       position:absolute; top:-10px; right:-10px; width:26px; height:26px; border-radius:50%;
-      border:none; background:#ff5c5c; color:#fff; cursor:pointer; display:none; font-weight:700;
+      border:none; background:#ff5c5c; color:var(--white); cursor:pointer; display:none; font-weight:700;
       box-shadow:0 2px 6px rgba(0,0,0,0.4); z-index:2;
     }
     .app:hover .delete-btn{ display:block; }
@@ -83,12 +86,26 @@
       width:var(--circle-size); height:var(--circle-size); border-radius:50%;
       background:rgba(255,255,255,0.04); display:flex; align-items:center; justify-content:center;
       border:2px solid rgba(255,255,255,0.06); cursor:pointer; transition:background .12s ease, transform .12s ease, box-shadow .12s ease;
-      color:#fff; font-weight:700; outline:none; touch-action: manipulation;
+      color:var(--white); font-weight:700; outline:none; touch-action: manipulation;
     }
     .circle-btn.selected{ border-color:var(--accent); box-shadow:0 0 0 6px rgba(0,191,255,0.18); transform:translateY(-3px); background:rgba(0,191,255,0.06); }
     .circle-label{ font-size:13px; color:#ddd; text-align:center; user-select:none; }
 
-    @media (max-width:900px){ :root{ --icon-size:120px; --gap:34px; --circle-size:54px; } }
+    /* modal */
+    .modal-overlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:var(--modal-bg); z-index:9999; }
+    .modal{ width:min(540px,92%); background:#0f1720; border-radius:12px; padding:18px; box-shadow:0 10px 40px rgba(0,0,0,0.6); color:var(--white); }
+    .modal h2{ margin:0 0 8px 0; font-size:18px; }
+    .modal .row{ display:flex; gap:10px; align-items:center; margin:8px 0; }
+    .modal label{ width:84px; color:var(--muted); font-size:13px; }
+    .modal input[type="text"]{ flex:1; padding:10px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:#0b1114; color:var(--white); outline:none; }
+    .modal .preview{ width:64px; height:64px; border-radius:10px; background:#111; display:flex; align-items:center; justify-content:center; overflow:hidden; border:1px solid rgba(255,255,255,0.04); }
+    .modal .hint{ color:#c4c4c4; font-size:13px; margin-top:8px; }
+    .modal .actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+    .btn{ padding:8px 12px; border-radius:8px; background:rgba(255,255,255,0.06); color:var(--white); border:1px solid rgba(255,255,255,0.04); cursor:pointer; }
+    .btn.primary{ background:linear-gradient(90deg,var(--accent),#36d0ff); color:#002; border:none; }
+    .error{ color:#ff9b9b; font-size:13px; margin-top:6px; display:none; }
+
+    @media (max-width:900px){ :root{ --icon-size:120px; --gap:34px; --circle-size:54px; } .modal{ width:92%; } }
   </style>
 </head>
 <body>
@@ -127,7 +144,7 @@
       </div>
 
       <!-- 追加ボタン -->
-      <div class="app" id="add-app" role="option" aria-selected="false">
+      <div class="app" id="add-app" role="option" aria-selected="false" tabindex="0">
         <div class="app-name">追加</div>
         <div class="icon">＋</div>
       </div>
@@ -151,9 +168,31 @@
     </div>
   </div>
 
+  <!-- Add Modal (ページ内でURL追加) -->
+  <div class="modal-overlay" id="addModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal" role="document" aria-labelledby="addModalTitle">
+      <h2 id="addModalTitle">アプリを追加</h2>
+      <div class="row">
+        <label for="appName">名前</label>
+        <input id="appName" type="text" placeholder="例: My Site (空欄可)" autocomplete="off"/>
+        <div class="preview" id="favPreview"><img id="favImg" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:none"></div>
+      </div>
+      <div class="row">
+        <label for="appUrl">URL</label>
+        <input id="appUrl" type="text" placeholder="example.com または https://example.com" autocomplete="off"/>
+      </div>
+      <div class="hint">URLは https を自動で補完します。無効なURLは追加できません。</div>
+      <div class="error" id="addError">無効なURLです。例: example.com</div>
+      <div class="actions">
+        <button class="btn" id="cancelAdd">キャンセル</button>
+        <button class="btn primary" id="confirmAdd">追加</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     /******************** 設定 ********************/
-    const HOLD_THRESHOLD = 300; // ms : 決定長押しやポインタ長押し判定
+    const HOLD_THRESHOLD = 300; // ms : 長押し判定
     /***********************************************/
 
     /* ---------------- Cookie utilities ---------------- */
@@ -212,6 +251,15 @@
     const launcher = document.getElementById('launcher');
     const addAppEl = document.getElementById('add-app');
     const circleBtns = [...document.querySelectorAll('.circle-btn')];
+
+    // modal elements
+    const addModal = document.getElementById('addModal');
+    const appNameInput = document.getElementById('appName');
+    const appUrlInput = document.getElementById('appUrl');
+    const confirmAddBtn = document.getElementById('confirmAdd');
+    const cancelAddBtn = document.getElementById('cancelAdd');
+    const addError = document.getElementById('addError');
+    const favImg = document.getElementById('favImg');
 
     let selectedIndex = 0;
     let circleIndex = -1;
@@ -421,7 +469,7 @@
         const a = apps()[selectedIndex];
         if (!a) return;
         if (a.id === 'add-app'){
-          openAddDialog();
+          showAddModal();
         } else {
           const url = a.dataset.url;
           if (url) window.open(url, '_blank');
@@ -431,30 +479,95 @@
       }
     }
 
-    /* ---------------- Add dialog ---------------- */
-    function openAddDialog(){
-      const name = prompt('アプリ名を入力してください:');
-      if (!name) return;
-      let urlInput = prompt('URLを入力してください: (例: example.com または https://example.com)');
-      if (!urlInput) return;
-      const normalized = normalizeUrl(urlInput);
+    /* ---------------- Modal: show/hide and adding ---------------- */
+    function showAddModal(preFillName = '', preFillUrl = '') {
+      addError.style.display = 'none';
+      favImg.style.display = 'none';
+      appNameInput.value = preFillName || '';
+      appUrlInput.value = preFillUrl || '';
+      addModal.style.display = 'flex';
+      addModal.setAttribute('aria-hidden','false');
+      // focus url input for quick typing
+      setTimeout(()=>appUrlInput.focus(), 80);
+    }
+
+    function hideAddModal() {
+      addModal.style.display = 'none';
+      addModal.setAttribute('aria-hidden','true');
+      appNameInput.value = '';
+      appUrlInput.value = '';
+      favImg.src = '';
+      favImg.style.display = 'none';
+      addError.style.display = 'none';
+      // return focus to add-app visually
+      addAppEl.focus?.();
+    }
+
+    function addAppFromModal(){
+      const nameRaw = appNameInput.value.trim();
+      const urlRaw = appUrlInput.value.trim();
+      const normalized = normalizeUrl(urlRaw);
       if (!normalized) {
-        alert('無効なURLです。もう一度試してください。');
+        addError.style.display = 'block';
         return;
       }
+      addError.style.display = 'none';
+      const name = nameRaw || (new URL(normalized)).hostname;
       const newEl = createAppElement(name, normalized);
       launcher.insertBefore(newEl, addAppEl);
       selectedIndex = apps().indexOf(newEl);
       circleIndex = -1;
       updateSelectionUI();
       saveAppsToCookie();
+      hideAddModal();
     }
 
+    // modal interactions
+    confirmAddBtn.addEventListener('click', (e) => { e.stopPropagation(); addAppFromModal(); });
+    cancelAddBtn.addEventListener('click', (e) => { e.stopPropagation(); hideAddModal(); });
+    addModal.addEventListener('click', (e) => {
+      if (e.target === addModal) hideAddModal(); // clicking overlay closes
+    });
+
+    // preview favicon as user types
+    appUrlInput.addEventListener('input', (e) => {
+      const val = e.target.value.trim();
+      const normalized = normalizeUrl(val);
+      if (!normalized) {
+        favImg.style.display = 'none';
+        favImg.src = '';
+        addError.style.display = 'none';
+      } else {
+        const fav = faviconFor(normalized);
+        favImg.src = fav;
+        favImg.style.display = 'block';
+        // if image fails to load, hide via onerror
+      }
+    });
+
+    favImg.addEventListener('error', () => { favImg.style.display = 'none'; });
+
+    // Enter inside modal triggers add, Escape cancels
+    addModal.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addAppFromModal(); }
+      if (e.key === 'Escape') { e.preventDefault(); hideAddModal(); }
+    });
+
+    /* ---------------- create/bind add-app interaction (open modal) ---------------- */
     addAppEl.addEventListener('click', (e) => {
       e.stopPropagation();
       const idx = apps().indexOf(addAppEl);
-      if (idx >= 0) { selectedIndex = idx; circleIndex = -1; updateSelectionUI(); }
-      openAddDialog();
+      if (idx >= 0) {
+        selectedIndex = idx;
+        circleIndex = -1;
+        updateSelectionUI();
+      }
+      showAddModal();
+    });
+
+    // also allow keyboard Enter when add-app focused to open modal
+    addAppEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); showAddModal(); }
     });
 
     /* ---------------- マウス: 右クリック削除（既存） ---------------- */
@@ -583,6 +696,8 @@
     let keyHoldTimer = null;
     let enterDown = false;
     document.addEventListener('keydown', (e) => {
+      // if modal open, let modal handle keys
+      if (addModal.style.display === 'flex') return;
       if (e.key === 'Enter') {
         if (enterDown) return;
         enterDown = true;
@@ -606,6 +721,7 @@
     });
 
     document.addEventListener('keyup', (e) => {
+      if (addModal.style.display === 'flex') return;
       if (e.key === 'Enter') {
         if (keyHoldTimer) {
           clearTimeout(keyHoldTimer);
@@ -655,6 +771,7 @@
 
     /* ---------------- click/dblclick handlers (通常クリック → 決定) ---------------- */
     launcher.addEventListener('click', (e) => {
+      if (addModal.style.display === 'flex') return; // ignore clicks when modal open
       const app = e.target.closest('.app');
       if (!app) return;
       const idx = apps().indexOf(app);
@@ -680,6 +797,7 @@
     });
 
     launcher.addEventListener('dblclick', (e) => {
+      if (addModal.style.display === 'flex') return;
       const app = e.target.closest('.app');
       if (!app) return;
       const idx = apps().indexOf(app);
@@ -703,7 +821,7 @@
     document.getElementById('btn-store').addEventListener('click', () => { window.open('https://www.amazon.co.jp/', '_blank'); });
     document.getElementById('btn-power').addEventListener('click', () => { alert('ｼｬｲｼｬｲｼｬｰｲ'); });
 
-    /* ---------------- gamepad: A の長押しで hold-mode、短押しで決定、Xで削除、Yで追加 ---------------- */
+    /* ---------------- gamepad: A の長押しで hold-mode、短押しで決定、Xで削除、Yでモーダル を開く ---------------- */
     let gpButtonDownTime = {};
     function pollGamepad(){
       const gpList = navigator.getGamepads && navigator.getGamepads();
@@ -727,7 +845,7 @@
           const down = gpButtonDownTime['A'] || 0;
           const dur = now() - down;
           delete gpButtonDownTime['A'];
-          if (dur < HOLD_THRESHOLD && !holdMode.active) { openSelected(); }
+          if (dur < HOLD_THRESHOLD && !holdMode.active && addModal.style.display !== 'flex') { openSelected(); }
           else if (holdMode.active && holdMode.initiatedBy === 'gamepad') { endHoldModeCommit(); }
           else { cancelHoldMode(); }
         }
@@ -735,8 +853,8 @@
           startHoldMode(selectedIndex, 'gamepad');
         }
 
-        if (buttons[2] && !gpPrevButtons[2]) { deleteSelectedApp(); }
-        if (buttons[3] && !gpPrevButtons[3]) { openAddDialog(); }
+        if (buttons[2] && !gpPrevButtons[2]) { deleteSelectedApp(); } // X
+        if (buttons[3] && !gpPrevButtons[3]) { showAddModal(); } // Y opens modal
 
         gpPrevButtons = buttons;
         gpPrevAxes[0] = axes[0];
@@ -764,6 +882,16 @@
     bindAppPointerHandlers(addAppEl);
 
     window.addEventListener('resize', ()=>{ setTimeout(()=>scrollSelectedIntoView(), 80); });
+
+    // Accessibility: trap focus in modal when open (simple)
+    document.addEventListener('focusin', (e) => {
+      if (addModal.style.display === 'flex') {
+        if (!addModal.contains(e.target)) {
+          e.stopPropagation();
+          appUrlInput.focus();
+        }
+      }
+    });
   </script>
 </body>
 </html>
